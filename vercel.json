@@ -1,11 +1,7 @@
 {
   "version": 2,
-  "installCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 && ./flutter/bin/flutter doctor",
-  "buildCommand": "./flutter/bin/flutter build web --release",
-  "outputDirectory": "build/web",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/api", "destination": "/api/index.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/api/index.js" }
   ]
 }

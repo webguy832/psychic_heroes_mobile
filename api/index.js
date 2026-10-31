@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
           }));
           return res.status(200).json(sliders);
         }
-      } catch (e) {}
+      } catch (e) { }
       return res.status(200).json(DEFAULT_SLIDERS);
     }
 
@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
           }));
           return res.status(200).json(categories);
         }
-      } catch (e) {}
+      } catch (e) { }
       return res.status(200).json([
         { id: 1, categoryName: "Psychic Reading", icon: "🔮", description: "Intuitive & spiritual guidance" },
         { id: 2, categoryName: "Tarot Reading", icon: "🎴", description: "Card spreads & symbolism" },
@@ -90,7 +90,7 @@ module.exports = async (req, res) => {
           }));
           return res.status(200).json(advisors);
         }
-      } catch (e) {}
+      } catch (e) { }
       return res.status(200).json([
         { id: 101, name: "Sanjeev Advisor", categoryName: "Tarot & Psychic", rating: 5.0, reviewsCount: 154, pricePerMinute: 3.99, status: "Online", profilePhoto: null, bio: "Master clairvoyant and spiritual advisor." }
       ]);
@@ -117,7 +117,7 @@ module.exports = async (req, res) => {
             });
           }
         }
-      } catch (e) {}
+      } catch (e) { }
       return res.status(200).json({
         id: 101,
         name: "Sanjeev Advisor",
@@ -159,7 +159,7 @@ module.exports = async (req, res) => {
             }
           });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const isEmail = cleanInput.includes('@');
       const name = isEmail ? cleanInput.split('@')[0] : cleanInput;
@@ -197,7 +197,7 @@ module.exports = async (req, res) => {
             role: "Customer"
           });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       return res.status(200).json({
         id: "8843249c-cf72-427b-bef7-6549199f2643",
@@ -226,7 +226,7 @@ module.exports = async (req, res) => {
           }));
           return res.status(200).json(addresses);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       return res.status(200).json([
         { id: 1, fullName: "Sanjeev User", addressLine1: "123 Main Street", city: "New York", state: "NY", postalCode: "10001", country: "USA", isDefault: true }
@@ -247,7 +247,7 @@ module.exports = async (req, res) => {
           }));
           return res.status(200).json(list);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       return res.status(200).json([
         { id: 1, title: "Welcome to PsychicHeroes", message: "Connect with top-rated advisors for personal guidance.", createdAt: new Date().toISOString(), isRead: false },
@@ -269,7 +269,7 @@ module.exports = async (req, res) => {
           }));
           return res.status(200).json(transactions);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       return res.status(200).json([
         { id: 1, transactionType: "Bonus Credit Deposit", amount: 25.00, status: "Completed", createdAt: new Date().toISOString() },
