@@ -36,7 +36,7 @@ class ApiEndpoints {
 
   // Wallet & Session Endpoints
   static const String walletTransactions = "api/wallet/transactions";
-  static const String readingHistory = "api/User/ReadingHistory";
+  static const String readingHistory = "api/customer/history";
 
   // Packages & Payment Endpoints (Exact matching web_angular_2025)
   static const String getAllPackages = "api/web/GetAllPackages";
@@ -45,4 +45,20 @@ class ApiEndpoints {
   static const String createPaymentIntent = "api/payment/create";
   static const String confirmPayment = "api/payment/confirm";
   static const String validateCoupon = "api/coupon/validate";
+
+  /// Resolves image URLs for advisor photos, static banners, and uploads matching Angular web app
+  static String resolveImageUrl(String? path) {
+    if (path == null || path.trim().isEmpty) return '';
+    final trimmed = path.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    if (trimmed.startsWith('assets/') || trimmed.startsWith('/assets/')) return trimmed;
+
+    final clean = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    if (clean.startsWith('Content/') || clean.startsWith('images/')) {
+      return '$baseUrl$clean';
+    }
+
+    final fileName = clean.contains('/') ? clean.substring(clean.lastIndexOf('/') + 1) : clean;
+    return '${baseUrl}api/Web/download/$fileName';
+  }
 }

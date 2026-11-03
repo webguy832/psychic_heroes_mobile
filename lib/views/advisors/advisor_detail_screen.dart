@@ -396,16 +396,16 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                               width: 90,
                               height: 105,
                               color: AppColors.primary.withOpacity(0.1),
-                              child: a.profilePhoto != null
+                              child: (a.profilePhoto != null && a.profilePhoto!.isNotEmpty)
                                   ? Image.network(
-                                      '${ApiEndpoints.imageBaseUrl}${a.profilePhoto}',
+                                      ApiEndpoints.resolveImageUrl(a.profilePhoto),
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Center(
-                                        child: Text(a.name[0].toUpperCase(), style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                        child: Text(a.name.isNotEmpty ? a.name[0].toUpperCase() : 'A', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AppColors.primary)),
                                       ),
                                     )
                                   : Center(
-                                      child: Text(a.name[0].toUpperCase(), style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                      child: Text(a.name.isNotEmpty ? a.name[0].toUpperCase() : 'A', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AppColors.primary)),
                                     ),
                             ),
                           ),

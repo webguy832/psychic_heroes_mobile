@@ -294,17 +294,36 @@ class ReadingHistoryItem {
   });
 
   factory ReadingHistoryItem.fromJson(Map<String, dynamic> json) {
+    final typeId = json['requestType'] ?? 1;
+    String typeLabel = 'Live Chat';
+    String typeKey = 'chat';
+    if (typeId == 2) {
+      typeLabel = 'Video Call';
+      typeKey = 'video';
+    } else if (typeId == 3) {
+      typeLabel = 'Voice Call';
+      typeKey = 'voice';
+    } else if (typeId == 4) {
+      typeLabel = 'Text Reading';
+      typeKey = 'text';
+    }
+
+    final dur = json['duration'];
+    final durationStr = dur is num && dur > 0
+        ? '${(dur / 60).ceil()} mins'
+        : (json['duration']?.toString() ?? '10 mins');
+
     return ReadingHistoryItem(
-      id: json['id']?.toString() ?? 'REQ-1',
-      title: json['title'] ?? 'Reading Session',
-      advisorName: json['advisorName'] ?? 'Psychic Advisor',
-      type: json['type'] ?? 'Live Chat',
-      typeKey: json['typeKey'] ?? 'chat',
-      duration: json['duration'] ?? '10 mins',
-      date: json['date'] ?? 'Recent',
-      cost: (json['cost'] ?? 0).toDouble(),
-      rating: json['rating'] ?? 5,
-      summary: json['summary'] ?? '',
+      id: json['requestId']?.toString() ?? json['id']?.toString() ?? '',
+      title: json['title'] ?? '$typeLabel Session',
+      advisorName: json['advisorDisplayName'] ?? json['advisorName'] ?? 'Psychic Advisor',
+      type: json['type'] ?? typeLabel,
+      typeKey: json['typeKey'] ?? typeKey,
+      duration: durationStr,
+      date: json['requestOn']?.toString().split('T').first ?? json['date'] ?? 'Recent',
+      cost: (json['chargedAmount'] ?? json['cost'] ?? 0).toDouble(),
+      rating: ((json['rating'] ?? 5) as num).toInt(),
+      summary: json['summaryPreview'] ?? json['summary'] ?? '',
       profilePhoto: json['profilePhoto'],
     );
   }

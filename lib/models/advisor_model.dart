@@ -25,12 +25,14 @@ class AdvisorDto {
     return AdvisorDto(
       id: json['id']?.toString() ?? json['advisorId']?.toString() ?? '',
       name: json['displayName'] ?? json['name'] ?? json['fullName'] ?? 'Advisor',
-      profilePhoto: json['profilePhoto'] ?? json['photoUrl'] ?? json['image'],
-      status: json['isOnline'] == true ? 'Online' : (json['status'] ?? json['onlineStatus'] ?? 'Offline'),
+      profilePhoto: json['photo'] ?? json['profileImageURL'] ?? json['profilePhoto'] ?? json['photoUrl'] ?? json['image'],
+      status: json['isOnline'] == true
+          ? 'Online'
+          : (json['isBusy'] == true ? 'Busy' : (json['status']?.toString() == '1' ? 'Online' : 'Offline')),
       rating: (json['rating'] ?? json['averageRating'] ?? 5.0).toDouble(),
       reviewsCount: json['reviewsCount'] ?? json['totalReviews'] ?? 0,
       pricePerMinute: (json['callRatePerMinute'] ?? json['fee'] ?? json['pricePerMinute'] ?? json['feePerMin'] ?? 1.99).toDouble(),
-      categoryName: json['category'] ?? json['categoryName'] ?? json['primaryCategory'],
+      categoryName: json['categoryName'] ?? json['category'] ?? json['primaryCategory'],
       bio: json['aboutMyServices'] ?? json['briefDescription'] ?? json['bio'] ?? json['aboutMe'],
     );
   }

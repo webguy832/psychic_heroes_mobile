@@ -16,10 +16,17 @@ class SliderDto {
   factory SliderDto.fromJson(Map<String, dynamic> json) {
     String img = json['imageUrl'] ?? json['bannerImage'] ?? '';
     if (img.isEmpty && json['bannerPath'] != null && json['bannerPath'].toString().isNotEmpty) {
-      final banner = json['bannerPath'].toString();
-      img = banner.startsWith('http')
-          ? banner
-          : 'https://psychicheroes.online/Content/Psychic/images/banners/$banner';
+      final banner = json['bannerPath'].toString().trim();
+      if (banner.startsWith('http://') || banner.startsWith('https://')) {
+        img = banner;
+      } else {
+        final clean = banner.startsWith('/') ? banner.substring(1) : banner;
+        if (clean.startsWith('Content/')) {
+          img = 'https://psychicheroes.online/$clean';
+        } else {
+          img = 'https://psychicheroes.online/Content/Psychic/images/banners/$clean';
+        }
+      }
     }
     return SliderDto(
       id: json['id'] ?? json['bannerId'] ?? 0,

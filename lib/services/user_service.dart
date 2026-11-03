@@ -39,27 +39,45 @@ class UserService {
   }
 
   Future<List<TransactionHistoryDto>> getTransactions() async {
-    final response = await ApiClient.get(ApiEndpoints.walletTransactions);
-    if (response is List) {
-      return response.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+    final token = await StorageService.getToken();
+    if (token == null || token.isEmpty) return [];
+    try {
+      final response = await ApiClient.get(ApiEndpoints.walletTransactions);
+      if (response is List) {
+        return response.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   Future<List<ReadingHistoryItem>> getReadingHistory() async {
-    final response = await ApiClient.get(ApiEndpoints.readingHistory);
-    if (response is List) {
-      return response.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+    final token = await StorageService.getToken();
+    if (token == null || token.isEmpty) return [];
+    try {
+      final response = await ApiClient.get(ApiEndpoints.readingHistory);
+      if (response is List) {
+        return response.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   Future<List<NotificationDto>> getNotifications() async {
-    final response = await ApiClient.get(ApiEndpoints.userNotifications);
-    if (response is List) {
-      return response.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
+    final token = await StorageService.getToken();
+    if (token == null || token.isEmpty) return [];
+    try {
+      final response = await ApiClient.get(ApiEndpoints.userNotifications);
+      if (response is List) {
+        return response.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   Future<void> markNotificationAsRead(int id) async {
@@ -71,11 +89,17 @@ class UserService {
   }
 
   Future<List<BillingAddressDto>> getBillingAddresses() async {
-    final response = await ApiClient.get(ApiEndpoints.getBillingAddresses);
-    if (response is List) {
-      return response.map((item) => BillingAddressDto.fromJson(item as Map<String, dynamic>)).toList();
+    final token = await StorageService.getToken();
+    if (token == null || token.isEmpty) return [];
+    try {
+      final response = await ApiClient.get(ApiEndpoints.getBillingAddresses);
+      if (response is List) {
+        return response.map((item) => BillingAddressDto.fromJson(item as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   Future<bool> createBillingAddress(BillingAddressDto dto) async {

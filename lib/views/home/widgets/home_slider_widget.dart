@@ -46,61 +46,77 @@ class _HomeSliderWidgetState extends State<HomeSliderWidget> {
                   borderRadius: BorderRadius.circular(AppStyles.borderRadiusLarge),
                   gradient: AppColors.cardGradient,
                   boxShadow: [AppStyles.cardShadow],
-                  image: slider.imageUrl.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(slider.imageUrl),
-                          fit: BoxFit.cover,
-                          colorFilter: ColorFilter.mode(
-                            Colors.black.withOpacity(0.55),
-                            BlendMode.darken,
-                          ),
-                        )
-                      : null,
                 ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentGold,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        "SPECIAL OFFER",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppStyles.borderRadiusLarge),
+                  child: Stack(
+                    children: [
+                      if (slider.imageUrl.isNotEmpty)
+                        Positioned.fill(
+                          child: Image.network(
+                            slider.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: AppColors.cardGradient,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withOpacity(0.55),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      slider.title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (slider.subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        slider.subtitle!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textPrimaryDark,
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentGold,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                "SPECIAL OFFER",
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              slider.title,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (slider.subtitle != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                slider.subtitle!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimaryDark,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ],
+                  ),
                 ),
               );
             },

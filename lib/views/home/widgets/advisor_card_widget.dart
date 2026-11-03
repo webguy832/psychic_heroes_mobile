@@ -71,9 +71,9 @@ class AdvisorCardWidget extends StatelessWidget {
                       width: 72,
                       height: 82,
                       color: AppColors.primary.withOpacity(0.1),
-                      child: advisor.profilePhoto != null
+                      child: (advisor.profilePhoto != null && advisor.profilePhoto!.isNotEmpty)
                           ? Image.network(
-                              '${ApiEndpoints.imageBaseUrl}${advisor.profilePhoto}',
+                              ApiEndpoints.resolveImageUrl(advisor.profilePhoto),
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) => Center(
                                 child: Text(
