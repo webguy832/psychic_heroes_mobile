@@ -109,7 +109,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               userDescription: _bioController.text.trim(),
             )
           : UserModel(
-              id: '8843249c-cf72-427b-bef7-6549199f2643',
+              id: currentUser?.id ?? '',
               email: _emailController.text.trim(),
               screenName: _screenNameController.text.trim(),
               firstName: _firstNameController.text.trim(),

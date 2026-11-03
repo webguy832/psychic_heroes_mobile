@@ -28,7 +28,7 @@ class UserService {
       'freeMinutes': 0,
       'totalPoints': 0,
       'currentStreak': 1,
-      'tierLevel': 'Mystic Member'
+      'tierLevel': 'Member'
     };
   }
 

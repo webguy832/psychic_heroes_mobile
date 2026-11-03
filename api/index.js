@@ -133,7 +133,10 @@ module.exports = async (req, res) => {
     // 5. Auth Login
     if (pathname.includes('login')) {
       const body = req.body || {};
-      const input = body.emailOrPhone || body.email || "sanjeev@user.com";
+      const input = body.emailOrPhone || body.email;
+      if (!input) {
+        return res.status(400).json({ success: false, message: "Email or phone required" });
+      }
       const cleanInput = input.trim().toLowerCase();
 
       try {
@@ -148,37 +151,24 @@ module.exports = async (req, res) => {
             success: true,
             token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.psychicheroes_staging_token",
             userId: u.Id,
-            userName: u.FullName || u.UserName || "Sanjeev User",
+            userName: u.FullName || u.UserName || u.Email,
             userRole: u.Email && u.Email.includes('advisor') ? "Advisor" : "Customer",
             user: {
               id: u.Id,
-              fullName: u.FullName || u.UserName || "Sanjeev User",
-              email: u.Email || `${input}@psychicheroes.com`,
+              fullName: u.FullName || u.UserName || u.Email,
+              email: u.Email || "",
               phoneNumber: u.PhoneNumber || "",
               role: u.Email && u.Email.includes('advisor') ? "Advisor" : "Customer"
             }
           });
         }
-      } catch (e) { }
+      } catch (e) {
+        console.error("Login DB error:", e);
+      }
 
-      const isEmail = cleanInput.includes('@');
-      const name = isEmail ? cleanInput.split('@')[0] : cleanInput;
-      const isAdvisor = cleanInput.includes('advisor');
-      const displayName = isAdvisor ? "Sanjeev Advisor" : (name.startsWith('sanjeev') ? "Sanjeev User" : name);
-      const role = isAdvisor ? "Advisor" : "Customer";
-
-      return res.status(200).json({
-        success: true,
-        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.psychicheroes_staging_token",
-        userId: isAdvisor ? "advisor_101" : "8843249c-cf72-427b-bef7-6549199f2643",
-        userName: displayName,
-        userRole: role,
-        user: {
-          id: isAdvisor ? "advisor_101" : "8843249c-cf72-427b-bef7-6549199f2643",
-          fullName: displayName,
-          email: isEmail ? cleanInput : `${cleanInput}@psychicheroes.com`,
-          role: role
-        }
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email, phone number, or password."
       });
     }
 
@@ -192,7 +182,18 @@ module.exports = async (req, res) => {
     const getUserId = () => {
       const q = parsedUrl.query || {};
       const b = parseBody(req);
-      return q.userId || q.id || b.userId || b.id || '8843249c-cf72-427b-bef7-6549199f2643';
+      const authHeader = req.headers?.authorization || req.headers?.Authorization;
+      let tokenUid = null;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const parts = authHeader.split(' ')[1].split('.');
+          if (parts.length === 3) {
+            const jwtPayload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+            tokenUid = jwtPayload.nameid || jwtPayload.sub || jwtPayload.userId || jwtPayload.id;
+          }
+        } catch (_) {}
+      }
+      return q.userId || q.id || b.userId || b.id || tokenUid || '';
     };
 
     // 6. User Profile (Get & Edit)
@@ -332,38 +333,24 @@ module.exports = async (req, res) => {
         console.error("Profile fetch error:", e);
       }
 
-      return res.status(200).json({
-        id: uid,
-        userId: uid,
-        screenName: "Sanjeev User",
-        firstName: "sanjeev",
-        lastName: "user",
-        fullName: "Sanjeev User",
-        email: "sanjeev@user.com",
-        phoneNumber: "+919813022123",
-        gender: "Male",
-        dateOfBirth: "1995-05-15",
-        addressStreet: "old street",
-        addressCity: "Delhi",
-        addressState: "Delhi",
-        addressZip: "110001",
-        addressCountry: "India",
-        addressPhone: "919813022123",
-        walletBalance: 27.85,
-        freeMinutes: 0,
-        karmaPoints: 130,
-        currentStreak: 1,
-        tierLevel: "Mystic Member",
-        role: "Customer",
-        affiliateLink: "https://psychicheroes.online/ref/sanjeev",
-        userDescription: "about",
-        profilePhoto: null
-      });
+      return res.status(404).json({ message: "User profile not found" });
     }
 
     // 7. Get Balance & Rewards (Sync with Angular customer-dashboard-profile)
     if (pathname.includes('GetBalanceInQuery') || pathname.toLowerCase().includes('user/balance') || pathname.includes('GetGamificationSummary')) {
       const uid = getUserId();
+      if (!uid) {
+        return res.status(200).json({
+          balance: 0.0,
+          minsBalance: 0,
+          freeMinutes: 0,
+          totalPoints: 0,
+          pointsBalance: 0,
+          currentStreak: 1,
+          tierLevel: "Member"
+        });
+      }
+
       try {
         const balRes = await pool.query(
           `SELECT b."Balance", b."MinsBalance", l."Balance" as "KarmaPoints"
@@ -375,13 +362,13 @@ module.exports = async (req, res) => {
         if (balRes.rows.length > 0) {
           const r = balRes.rows[0];
           return res.status(200).json({
-            balance: parseFloat(r.Balance || 27.85),
+            balance: parseFloat(r.Balance || 0),
             minsBalance: parseInt(r.MinsBalance || 0),
             freeMinutes: parseInt(r.MinsBalance || 0),
-            totalPoints: parseInt(r.KarmaPoints || 130),
-            pointsBalance: parseInt(r.KarmaPoints || 130),
+            totalPoints: parseInt(r.KarmaPoints || 0),
+            pointsBalance: parseInt(r.KarmaPoints || 0),
             currentStreak: 1,
-            tierLevel: "Mystic Member"
+            tierLevel: "Member"
           });
         }
       } catch (e) {
@@ -389,13 +376,13 @@ module.exports = async (req, res) => {
       }
 
       return res.status(200).json({
-        balance: 27.85,
+        balance: 0.0,
         minsBalance: 0,
         freeMinutes: 0,
-        totalPoints: 130,
-        pointsBalance: 130,
+        totalPoints: 0,
+        pointsBalance: 0,
         currentStreak: 1,
-        tierLevel: "Mystic Member"
+        tierLevel: "Member"
       });
     }
 
@@ -449,11 +436,15 @@ module.exports = async (req, res) => {
     // 10. Real Wallet Transactions (Direct from TransactionHistories)
     if (pathname.includes('transactions') || pathname.includes('Transactions') || pathname.includes('WalletHistory')) {
       const uid = getUserId();
+      if (!uid) {
+        return res.status(200).json([]);
+      }
+
       try {
         const txRes = await pool.query(
           `SELECT "TransId", "Credit", "Debit", "Balance", "MinsBalance", "TransType", "Description", "CreatedAt", "InvoiceId"
            FROM "TransactionHistories"
-           WHERE "UserId" = $1 OR "UserId" = '8843249c-cf72-427b-bef7-6549199f2643'
+           WHERE "UserId" = $1
            ORDER BY "CreatedAt" DESC LIMIT 30`,
           [uid]
         );
@@ -485,35 +476,21 @@ module.exports = async (req, res) => {
         console.error("Transactions query error:", e);
       }
 
-      return res.status(200).json([
-        {
-          id: "TXN-2500",
-          transactionId: "TXN-2500",
-          transId: 2500,
-          title: "Fees charged for Call with Sanjeev Advisor",
-          description: "Fees charged for Call with Sanjeev Advisor",
-          transactionType: "Debit",
-          type: "debit",
-          amount: 0.49,
-          credit: 0,
-          debit: 0.49,
-          balance: 27.85,
-          minsBalance: 0,
-          status: "Completed",
-          createdAt: "2026-07-10T12:03:30.122Z",
-          date: "July 10, 2026 • 12:03 PM"
-        }
-      ]);
+      return res.status(200).json([]);
     }
 
     // 11. Reading & Session History (Real Database Sessions)
     if (pathname.includes('ReadingHistory') || pathname.includes('reading-history')) {
       const uid = getUserId();
+      if (!uid) {
+        return res.status(200).json([]);
+      }
+
       try {
         const txRes = await pool.query(
           `SELECT "TransId", "Description", "Debit", "CreatedAt"
            FROM "TransactionHistories"
-           WHERE ("UserId" = $1 OR "UserId" = '8843249c-cf72-427b-bef7-6549199f2643') 
+           WHERE "UserId" = $1
              AND ("Description" ILIKE '%Call%' OR "Description" ILIKE '%Chat%' OR "Description" ILIKE '%Voice%')
            ORDER BY "CreatedAt" DESC LIMIT 20`,
           [uid]

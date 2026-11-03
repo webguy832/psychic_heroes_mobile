@@ -39,7 +39,7 @@ class UserModel {
     this.freeMinutes = 0,
     this.karmaPoints = 0,
     this.streakCount = 1,
-    this.tierLevel = "Mystic Member",
+    this.tierLevel = "Member",
     this.dateOfBirth,
     this.gender,
     this.zodiacSign,
@@ -87,7 +87,7 @@ class UserModel {
     final phone = data['phoneNumber'] ?? data['phone'] ?? data['contact'] ?? data['address_Phone'] ?? data['AddressPhone'];
 
     return UserModel(
-      id: data['id']?.toString() ?? data['userId']?.toString() ?? data['Id']?.toString() ?? '8843249c-cf72-427b-bef7-6549199f2643',
+      id: data['id']?.toString() ?? data['userId']?.toString() ?? data['Id']?.toString() ?? '',
       email: data['email'] ?? data['Email'] ?? '',
       fullName: fn ?? (fName != null ? '$fName ${lName ?? ''}'.trim() : sn),
       screenName: sn ?? fn,
@@ -100,12 +100,12 @@ class UserModel {
           ? (data['freeMinutes'] ?? data['minsBalance'] ?? data['MinsBalance'] ?? 0).toInt() 
           : 0,
       karmaPoints: (data['karmaPoints'] ?? data['karma'] ?? data['totalPoints'] ?? data['pointsBalance'] ?? data['KarmaPoints'] ?? 0) is num
-          ? (data['karmaPoints'] ?? data['karma'] ?? data['totalPoints'] ?? data['pointsBalance'] ?? data['KarmaPoints'] ?? 0).toInt()
+          ? (data['karmaPoints'] ?? data['karma'] ?? data['totalPoints'] ?? data['pointsBalance'] ?? data['KarmaPoints'] ?? 0).toInt() 
           : 0,
       streakCount: (data['currentStreak'] ?? data['streakCount'] ?? data['streak'] ?? 1) is num
-          ? (data['currentStreak'] ?? data['streakCount'] ?? data['streak'] ?? 1).toInt()
+          ? (data['currentStreak'] ?? data['streakCount'] ?? data['streak'] ?? 1).toInt() 
           : 1,
-      tierLevel: data['tierLevel']?.toString() ?? "Mystic Member",
+      tierLevel: data['tierLevel']?.toString() ?? data['TierLevel']?.toString() ?? "Member",
       dateOfBirth: data['dateOfBirth'] ?? data['dob'] ?? data['DateOfBirth'],
       gender: data['gender'] ?? data['Gender'],
       zodiacSign: data['zodiacSign'] ?? data['zodiac'] ?? data['ZodiacSign'],

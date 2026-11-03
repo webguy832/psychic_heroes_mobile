@@ -27,7 +27,7 @@ class UserProvider extends ChangeNotifier {
   int get freeMinutes => _user?.freeMinutes ?? 0;
   int get karmaPoints => _user?.karmaPoints ?? 0;
   int get currentStreak => _user?.streakCount ?? 1;
-  String get tierLevel => _user?.tierLevel ?? "Mystic Member";
+  String get tierLevel => _user?.tierLevel ?? "Member";
 
   bool get isAdvisor => _user?.role?.toUpperCase().contains('ADVISOR') == true || _user?.email.toLowerCase().contains('advisor') == true;
   bool get isCustomer => !isAdvisor;
