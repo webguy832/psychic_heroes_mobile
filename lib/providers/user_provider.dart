@@ -10,18 +10,24 @@ class UserProvider extends ChangeNotifier {
   UserModel? _user;
   List<BillingAddressDto> _billingAddresses = [];
   List<NotificationDto> _notifications = [];
+  List<TransactionHistoryDto> _transactions = [];
+  List<ReadingHistoryItem> _readingHistory = [];
   bool _isLoading = false;
   String? _errorMessage;
-  int _karmaPoints = 150;
 
   UserModel? get user => _user;
   List<BillingAddressDto> get billingAddresses => _billingAddresses;
   List<NotificationDto> get notifications => _notifications;
+  List<TransactionHistoryDto> get transactions => _transactions;
+  List<ReadingHistoryItem> get readingHistory => _readingHistory;
   int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   double get userBalance => _user?.walletBalance ?? 0.0;
-  int get karmaPoints => _karmaPoints;
+  int get freeMinutes => _user?.freeMinutes ?? 0;
+  int get karmaPoints => _user?.karmaPoints ?? 0;
+  int get currentStreak => _user?.streakCount ?? 1;
+  String get tierLevel => _user?.tierLevel ?? "Mystic Member";
 
   bool get isAdvisor => _user?.role?.toUpperCase().contains('ADVISOR') == true || _user?.email.toLowerCase().contains('advisor') == true;
   bool get isCustomer => !isAdvisor;
@@ -29,26 +35,23 @@ class UserProvider extends ChangeNotifier {
   void updateWalletBalance(double newBalance) {
     if (_user != null) {
       _user = _user!.copyWith(walletBalance: newBalance);
-    } else {
-      _user = UserModel(
-        id: '1',
-        email: 'user@example.com',
-        fullName: 'User',
-        walletBalance: newBalance,
-      );
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   void addKarmaPoints(int pts) {
-    _karmaPoints += pts;
-    notifyListeners();
+    if (_user != null) {
+      _user = _user!.copyWith(karmaPoints: _user!.karmaPoints + pts);
+      notifyListeners();
+    }
   }
 
   void clearUser() {
     _user = null;
     _billingAddresses = [];
     _notifications = [];
+    _transactions = [];
+    _readingHistory = [];
     notifyListeners();
   }
 
@@ -69,18 +72,27 @@ class UserProvider extends ChangeNotifier {
       if (savedUser != null && savedUser.isNotEmpty) {
         _user = UserModel.fromJson(savedUser);
       }
+
       final apiUser = await _userService.getUserProfile();
-      if (_user == null) {
-        _user = apiUser;
-      } else {
-        // Merge real logged in user state
-        _user = _user!.copyWith(
-          fullName: (_user!.fullName?.isNotEmpty == true) ? _user!.fullName : apiUser.fullName,
-          email: (_user!.email.isNotEmpty) ? _user!.email : apiUser.email,
-          phoneNumber: (_user!.phoneNumber?.isNotEmpty == true) ? _user!.phoneNumber : apiUser.phoneNumber,
-          walletBalance: apiUser.walletBalance > 0 ? apiUser.walletBalance : _user!.walletBalance,
-        );
-      }
+      Map<String, dynamic> balanceSummary = {};
+      try {
+        balanceSummary = await _userService.getUserBalanceSummary();
+      } catch (_) {}
+
+      final bal = (balanceSummary['balance'] ?? balanceSummary['walletBalance'] ?? apiUser.walletBalance);
+      final freeMins = (balanceSummary['minsBalance'] ?? balanceSummary['freeMinutes'] ?? apiUser.freeMinutes);
+      final pts = (balanceSummary['totalPoints'] ?? balanceSummary['pointsBalance'] ?? apiUser.karmaPoints);
+      final streak = (balanceSummary['currentStreak'] ?? apiUser.streakCount);
+      final tier = (balanceSummary['tierLevel'] ?? apiUser.tierLevel);
+
+      _user = apiUser.copyWith(
+        walletBalance: (bal is num) ? bal.toDouble() : apiUser.walletBalance,
+        freeMinutes: (freeMins is num) ? freeMins.toInt() : apiUser.freeMinutes,
+        karmaPoints: (pts is num) ? pts.toInt() : apiUser.karmaPoints,
+        streakCount: (streak is num) ? streak.toInt() : apiUser.streakCount,
+        tierLevel: tier?.toString() ?? apiUser.tierLevel,
+      );
+
       await StorageService.saveUser(_user!.toJson());
     } catch (e) {
       _errorMessage = e.toString();
@@ -99,6 +111,7 @@ class UserProvider extends ChangeNotifier {
       _user = updatedUser;
       await StorageService.saveUser(updatedUser.toJson());
       await _userService.editProfile(updatedUser.toJson());
+      await fetchUserProfile();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -107,6 +120,26 @@ class UserProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> fetchTransactions() async {
+    try {
+      _transactions = await _userService.getTransactions();
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchReadingHistory() async {
+    try {
+      _readingHistory = await _userService.getReadingHistory();
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
     }
   }
 

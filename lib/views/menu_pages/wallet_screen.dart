@@ -16,52 +16,24 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   String _selectedFilter = "all";
 
-  final List<Map<String, dynamic>> _mockTransactions = [
-    {
-      'id': 'TXN-90821',
-      'title': 'Wallet Recharge (Stripe)',
-      'type': 'credit',
-      'amount': 50.00,
-      'date': 'Sept 28, 2026 • 04:15 PM',
-      'icon': Icons.add_card_rounded,
-      'status': 'Completed'
-    },
-    {
-      'id': 'TXN-89102',
-      'title': 'Live Session - Psychic Serena',
-      'type': 'debit',
-      'amount': 15.96,
-      'date': 'Sept 25, 2026 • 08:30 PM',
-      'icon': Icons.forum_rounded,
-      'status': 'Billed'
-    },
-    {
-      'id': 'TXN-87612',
-      'title': 'Voice Call - Master Orion',
-      'type': 'debit',
-      'amount': 23.94,
-      'date': 'Sept 20, 2026 • 02:45 PM',
-      'icon': Icons.phone_in_talk_rounded,
-      'status': 'Billed'
-    },
-    {
-      'id': 'TXN-84511',
-      'title': 'Welcome Bonus Credit',
-      'type': 'credit',
-      'amount': 10.00,
-      'date': 'Sept 15, 2026 • 10:00 AM',
-      'icon': Icons.card_giftcard_rounded,
-      'status': 'Bonus'
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProv = Provider.of<UserProvider>(context, listen: false);
+      userProv.fetchUserProfile();
+      userProv.fetchTransactions();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final userProv = Provider.of<UserProvider>(context);
+    final transactions = userProv.transactions;
 
-    final filteredTransactions = _mockTransactions.where((t) {
-      if (_selectedFilter == "credits") return t['type'] == 'credit';
-      if (_selectedFilter == "debits") return t['type'] == 'debit';
+    final filteredTransactions = transactions.where((t) {
+      if (_selectedFilter == "credits") return t.type == 'credit';
+      if (_selectedFilter == "debits") return t.type == 'debit';
       return true;
     }).toList();
 
@@ -176,74 +148,92 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(height: 12),
 
                   // Transactions List
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: filteredTransactions.length,
-                    itemBuilder: (ctx, i) {
-                      final txn = filteredTransactions[i];
-                      final isCredit = txn['type'] == 'credit';
+                  if (filteredTransactions.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgDarkCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.borderDark),
+                      ),
+                      child: Column(
+                        children: const [
+                          Icon(Icons.receipt_long_outlined, size: 40, color: AppColors.textSecondaryDark),
+                          SizedBox(height: 8),
+                          Text("No transactions found", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)),
+                        ],
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredTransactions.length,
+                      itemBuilder: (ctx, i) {
+                        final txn = filteredTransactions[i];
+                        final isCredit = txn.type == 'credit';
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgDarkCard,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: isCredit ? AppColors.onlineGreen.withOpacity(0.15) : AppColors.errorRed.withOpacity(0.15),
-                                shape: BoxShape.circle,
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgDarkCard,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.borderDark),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: isCredit ? AppColors.onlineGreen.withOpacity(0.15) : AppColors.errorRed.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isCredit ? Icons.add_card_rounded : Icons.forum_rounded,
+                                  color: isCredit ? AppColors.onlineGreen : AppColors.errorRed,
+                                  size: 20,
+                                ),
                               ),
-                              child: Icon(
-                                txn['icon'] as IconData,
-                                color: isCredit ? AppColors.onlineGreen : AppColors.errorRed,
-                                size: 20,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(txn.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                                    const SizedBox(height: 2),
+                                    Text("${txn.id} • ${txn.date}", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(txn['title'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                                  Text(
+                                    "${isCredit ? '+' : '-'}\$${txn.amount.toStringAsFixed(2)}",
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: isCredit ? AppColors.onlineGreen : AppColors.errorRed,
+                                    ),
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text("${txn['id']} • ${txn['date']}", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white10,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(txn.status, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 9)),
+                                  ),
                                 ],
                               ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  "${isCredit ? '+' : '-'}\$${(txn['amount'] as double).toStringAsFixed(2)}",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: isCredit ? AppColors.onlineGreen : AppColors.errorRed,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white10,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(txn['status'] as String, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 9)),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
             ),

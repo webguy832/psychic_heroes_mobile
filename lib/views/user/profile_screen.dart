@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
@@ -12,6 +13,11 @@ import 'edit_profile_screen.dart';
 import 'billing_address_screen.dart';
 import 'notifications_screen.dart';
 import 'login_screen.dart';
+import '../menu_pages/add_funds_screen.dart';
+import '../menu_pages/help_support_screen.dart';
+import '../menu_pages/reading_history_screen.dart';
+import '../menu_pages/wallet_screen.dart';
+import '../menu_pages/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -99,10 +105,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: AppColors.primary,
-                    backgroundImage: user?.profilePhoto != null
-                        ? NetworkImage('${ApiEndpoints.imageBaseUrl}${user!.profilePhoto}')
+                    backgroundImage: user?.profilePhoto != null && user!.profilePhoto!.isNotEmpty
+                        ? NetworkImage(user!.profilePhoto!.startsWith('http') ? user!.profilePhoto! : '${ApiEndpoints.imageBaseUrl}${user!.profilePhoto}')
                         : null,
-                    child: user?.profilePhoto == null
+                    child: (user?.profilePhoto == null || user!.profilePhoto!.isEmpty)
                         ? Text(
                             user?.displayName.isNotEmpty == true
                                 ? user!.displayName[0].toUpperCase()
@@ -115,9 +121,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        user?.displayName ?? "Valued Member",
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
+                      Flexible(
+                        child: Text(
+                          user?.displayName ?? "Member",
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -138,10 +147,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    user?.email ?? "",
-                    style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
-                  ),
+                  if (user?.email != null && user!.email.isNotEmpty)
+                    Text(
+                      user!.email,
+                      style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+                    ),
                   if (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
@@ -153,15 +163,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Divider(color: AppColors.borderDark),
                   const SizedBox(height: 12),
                   
-                  // Balance & Points Stats
+                  // Balance & Points Stats (4 Dynamic items matching Angular)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _buildStatItem("Wallet Balance", "\$${(user?.walletBalance ?? 0.0).toStringAsFixed(2)}", AppColors.accentGold),
                       Container(width: 1, height: 36, color: AppColors.borderDark),
-                      _buildStatItem("Zodiac Sign", user?.zodiacSign ?? "Aries", AppColors.accentCyan),
+                      _buildStatItem("Free Minutes", "${user?.freeMinutes ?? 0} Mins", AppColors.accentCyan),
                       Container(width: 1, height: 36, color: AppColors.borderDark),
                       _buildStatItem("Karma Points", "${user?.karmaPoints ?? 0} Pts", AppColors.successGreen),
+                      Container(width: 1, height: 36, color: AppColors.borderDark),
+                      _buildStatItem("Tier", user?.tierLevel ?? "Member", AppColors.textPrimaryDark),
                     ],
                   ),
                 ],
@@ -170,7 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 16),
 
-            // Profile Details Overview Card
+            // Profile Details Overview Card (All dynamic fields from Angular)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -196,17 +208,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                   const Divider(color: AppColors.borderDark),
-                  _buildDetailRow("Screen Name", user?.screenName ?? user?.displayName ?? "-"),
-                  _buildDetailRow("Gender", user?.gender ?? "Not specified"),
-                  _buildDetailRow("Date of Birth", user?.dateOfBirth ?? "Not set"),
-                  _buildDetailRow("Country", user?.country ?? "Not set"),
+                  _buildDetailRow("Screen Name", (user?.screenName != null && user!.screenName!.isNotEmpty) ? user.screenName! : (user?.displayName ?? "Not set")),
+                  _buildDetailRow("First Name", (user?.firstName != null && user!.firstName!.isNotEmpty) ? user.firstName! : "Not set"),
+                  _buildDetailRow("Last Name", (user?.lastName != null && user!.lastName!.isNotEmpty) ? user.lastName! : "Not set"),
+                  _buildDetailRow("Gender", (user?.gender != null && user!.gender!.isNotEmpty) ? user.gender! : "Not specified"),
+                  _buildDetailRow("Date of Birth", (user?.dateOfBirth != null && user!.dateOfBirth!.isNotEmpty) ? user.dateOfBirth! : "Not set"),
+                  _buildDetailRow("Mobile Number", (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) ? user.phoneNumber! : "Not set"),
+                  _buildDetailRow("Street Address", (user?.addressStreet != null && user!.addressStreet!.isNotEmpty) ? user.addressStreet! : "Not set"),
+                  _buildDetailRow("City / State", (user?.addressCity != null || user?.addressState != null) ? "${user?.addressCity ?? ''} ${user?.addressState ?? ''}".trim() : "Not set"),
+                  _buildDetailRow("Country", (user?.addressCountry != null && user!.addressCountry!.isNotEmpty) ? user.addressCountry! : (user?.country ?? "Not set")),
+                  if (user?.affiliateLink != null && user!.affiliateLink!.isNotEmpty) ...[
+                    const Divider(color: AppColors.borderDark),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Referral Link", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
+                        Row(
+                          children: [
+                            Text(
+                              user.affiliateLink!.length > 24 ? '${user.affiliateLink!.substring(0, 22)}...' : user.affiliateLink!,
+                              style: const TextStyle(color: AppColors.accentCyan, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(Icons.copy_rounded, size: 16, color: AppColors.accentGold),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: user.affiliateLink!));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Referral link copied to clipboard!")),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // Actions List
+            // Actions List (Fully connected to real pages)
             _buildProfileTile(
               icon: Icons.notifications_none_rounded,
               title: "Notifications",
@@ -215,27 +262,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
             ),
             _buildProfileTile(
+              icon: Icons.account_balance_wallet_outlined,
+              title: "My Wallet & Transactions",
+              subtitle: "View real statements & balance breakdown",
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen())),
+            ),
+            if (!isAdvisor)
+              _buildProfileTile(
+                icon: Icons.add_card_rounded,
+                title: "Add Funds / Recharge",
+                subtitle: "Top up wallet balance for psychic sessions",
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddFundsScreen())),
+              ),
+            _buildProfileTile(
+              icon: Icons.history_edu_rounded,
+              title: "Reading & Session History",
+              subtitle: "View past chat, voice, and video consultations",
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReadingHistoryScreen())),
+            ),
+            _buildProfileTile(
               icon: Icons.location_on_outlined,
               title: "Billing Addresses",
               subtitle: "Saved billing and contact locations",
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillingAddressScreen())),
             ),
-            if (!isAdvisor)
-              _buildProfileTile(
-                icon: Icons.account_balance_wallet_outlined,
-                title: "Add Funds / Recharge",
-                subtitle: "Top up wallet balance for sessions",
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Recharge payment gateway opened")),
-                  );
-                },
-              ),
+            _buildProfileTile(
+              icon: Icons.settings_outlined,
+              title: "Settings & Preferences",
+              subtitle: "Notification settings, account privacy & security",
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            ),
             _buildProfileTile(
               icon: Icons.help_outline_rounded,
               title: "Help & Support",
               subtitle: "Contact support, FAQ, & disputes",
-              onTap: () {},
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen())),
             ),
 
             const SizedBox(height: 24),

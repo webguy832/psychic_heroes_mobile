@@ -46,9 +46,9 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
   BillingAddressDto? _existingBilling;
 
   // Step 3 Payment Controllers
-  final TextEditingController _cardNumberController = TextEditingController(text: "4242 •••• •••• 4242");
-  final TextEditingController _cardExpiryController = TextEditingController(text: "12 / 28");
-  final TextEditingController _cardCvcController = TextEditingController(text: "123");
+  final TextEditingController _cardNumberController = TextEditingController();
+  final TextEditingController _cardExpiryController = TextEditingController();
+  final TextEditingController _cardCvcController = TextEditingController();
   bool _isProcessing = false;
   String? _paymentErrorMessage;
 
@@ -95,7 +95,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
           _existingBilling = billings.first;
           _firstNameController.text = _existingBilling!.firstName ?? '';
           _lastNameController.text = _existingBilling!.lastName ?? '';
-          _dobController.text = _existingBilling!.dateOfBirth ?? '1995-05-15';
+          _dobController.text = _existingBilling!.dateOfBirth ?? '';
           _emailController.text = _existingBilling!.email ?? '';
           _addressController.text = _existingBilling!.addressLine1;
           _cityController.text = _existingBilling!.city;
@@ -112,15 +112,15 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
           final userProv = Provider.of<UserProvider>(context, listen: false);
           final u = userProv.user;
           if (u != null) {
-            _firstNameController.text = u.firstName ?? u.displayName.split(' ').first;
-            _lastNameController.text = u.lastName ?? (u.displayName.split(' ').length > 1 ? u.displayName.split(' ').last : '');
+            _firstNameController.text = u.firstName ?? (u.displayName.isNotEmpty ? u.displayName.split(' ').first : '');
+            _lastNameController.text = u.lastName ?? (u.displayName.split(' ').length > 1 ? u.displayName.split(' ').sublist(1).join(' ') : '');
             _emailController.text = u.email;
-            _phoneController.text = u.phoneNumber ?? '';
-            _dobController.text = u.dateOfBirth ?? '1995-05-15';
-            _addressController.text = "742 Evergreen Terrace";
-            _cityController.text = "Springfield";
-            _stateController.text = "IL";
-            _postalCodeController.text = "62704";
+            _phoneController.text = (u.phoneNumber?.isNotEmpty == true) ? u.phoneNumber! : (u.addressPhone ?? '');
+            _dobController.text = u.dateOfBirth ?? '';
+            _addressController.text = u.addressStreet ?? '';
+            _cityController.text = u.addressCity ?? '';
+            _stateController.text = u.addressState ?? '';
+            _postalCodeController.text = u.addressZip ?? '';
           }
         }
       });
@@ -834,6 +834,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
         CustomTextField(
           controller: _cardNumberController,
           labelText: "Card Number",
+          hintText: "•••• •••• •••• ••••",
           prefixIcon: Icons.credit_card_rounded,
         ),
         const SizedBox(height: 10),
@@ -844,6 +845,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
               child: CustomTextField(
                 controller: _cardExpiryController,
                 labelText: "Expiration (MM/YY)",
+                hintText: "MM / YY",
               ),
             ),
             const SizedBox(width: 10),
@@ -851,6 +853,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
               child: CustomTextField(
                 controller: _cardCvcController,
                 labelText: "CVC / CVV",
+                hintText: "CVC",
                 obscureText: true,
               ),
             ),

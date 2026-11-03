@@ -18,14 +18,40 @@ class UserService {
     return response != null;
   }
 
-  Future<double> getUserBalance() async {
+  Future<Map<String, dynamic>> getUserBalanceSummary() async {
     final response = await ApiClient.get(ApiEndpoints.userBalance);
-    if (response is Map && response.containsKey('balance')) {
-      return (response['balance'] as num).toDouble();
-    } else if (response is num) {
-      return response.toDouble();
+    if (response is Map<String, dynamic>) {
+      return response;
     }
-    return 0.0;
+    return {
+      'balance': 0.0,
+      'freeMinutes': 0,
+      'totalPoints': 0,
+      'currentStreak': 1,
+      'tierLevel': 'Mystic Member'
+    };
+  }
+
+  Future<double> getUserBalance() async {
+    final summary = await getUserBalanceSummary();
+    final bal = summary['balance'] ?? summary['walletBalance'] ?? 0;
+    return (bal as num).toDouble();
+  }
+
+  Future<List<TransactionHistoryDto>> getTransactions() async {
+    final response = await ApiClient.get(ApiEndpoints.walletTransactions);
+    if (response is List) {
+      return response.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<List<ReadingHistoryItem>> getReadingHistory() async {
+    final response = await ApiClient.get(ApiEndpoints.readingHistory);
+    if (response is List) {
+      return response.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
   }
 
   Future<List<NotificationDto>> getNotifications() async {

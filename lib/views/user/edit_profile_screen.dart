@@ -21,13 +21,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _dobController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _zipController = TextEditingController();
   final _countryController = TextEditingController();
+  final _bioController = TextEditingController();
 
-  String _selectedGender = "Male";
+  String _selectedGender = "Not specified";
   String _selectedZodiac = "Aries";
   final _formKey = GlobalKey<FormState>();
 
-  final List<String> _genders = ["Male", "Female", "Non-Binary", "Prefer Not to Say"];
+  final List<String> _genders = ["Male", "Female", "Non-Binary", "Prefer Not to Say", "Not specified"];
   final List<String> _zodiacSigns = [
     "Aries", "Taurus", "Gemini", "Cancer",
     "Leo", "Virgo", "Libra", "Scorpio",
@@ -44,8 +49,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _lastNameController.text = user.lastName ?? '';
       _emailController.text = user.email;
       _phoneController.text = user.phoneNumber ?? '';
-      _dobController.text = user.dateOfBirth ?? '';
-      _countryController.text = user.country ?? '';
+      _dobController.text = (user.dateOfBirth != null && user.dateOfBirth != "Not set") ? user.dateOfBirth! : '';
+      _streetController.text = user.addressStreet ?? '';
+      _cityController.text = user.addressCity ?? '';
+      _stateController.text = user.addressState ?? '';
+      _zipController.text = user.addressZip ?? '';
+      _countryController.text = user.addressCountry ?? user.country ?? '';
+      _bioController.text = user.userDescription ?? '';
+
       if (user.gender != null && _genders.contains(user.gender)) {
         _selectedGender = user.gender!;
       }
@@ -63,7 +74,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _dobController.dispose();
+    _streetController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _zipController.dispose();
     _countryController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
@@ -72,22 +88,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final userProv = Provider.of<UserProvider>(context, listen: false);
       final currentUser = userProv.user;
       
-      final updatedUser = UserModel(
-        id: currentUser?.id ?? '1',
-        email: _emailController.text.trim(),
-        screenName: _screenNameController.text.trim(),
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        fullName: '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
-        phoneNumber: _phoneController.text.trim(),
-        profilePhoto: currentUser?.profilePhoto,
-        walletBalance: currentUser?.walletBalance ?? 25.0,
-        karmaPoints: currentUser?.karmaPoints ?? 0,
-        dateOfBirth: _dobController.text.trim(),
-        gender: _selectedGender,
-        zodiacSign: _selectedZodiac,
-        country: _countryController.text.trim(),
-      );
+      final updatedUser = (currentUser != null)
+          ? currentUser.copyWith(
+              email: _emailController.text.trim(),
+              screenName: _screenNameController.text.trim(),
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
+              fullName: '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
+              phoneNumber: _phoneController.text.trim(),
+              dateOfBirth: _dobController.text.trim(),
+              gender: _selectedGender,
+              zodiacSign: _selectedZodiac,
+              country: _countryController.text.trim(),
+              addressStreet: _streetController.text.trim(),
+              addressCity: _cityController.text.trim(),
+              addressState: _stateController.text.trim(),
+              addressZip: _zipController.text.trim(),
+              addressCountry: _countryController.text.trim(),
+              addressPhone: _phoneController.text.trim(),
+              userDescription: _bioController.text.trim(),
+            )
+          : UserModel(
+              id: '8843249c-cf72-427b-bef7-6549199f2643',
+              email: _emailController.text.trim(),
+              screenName: _screenNameController.text.trim(),
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
+              fullName: '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
+              phoneNumber: _phoneController.text.trim(),
+              dateOfBirth: _dobController.text.trim(),
+              gender: _selectedGender,
+              zodiacSign: _selectedZodiac,
+              country: _countryController.text.trim(),
+              addressStreet: _streetController.text.trim(),
+              addressCity: _cityController.text.trim(),
+              addressState: _stateController.text.trim(),
+              addressZip: _zipController.text.trim(),
+              addressCountry: _countryController.text.trim(),
+              addressPhone: _phoneController.text.trim(),
+              userDescription: _bioController.text.trim(),
+            );
 
       final success = await userProv.updateUserProfile(updatedUser);
       if (mounted && success) {
@@ -108,7 +148,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Profile Information"),
+        title: const Text("Edit Profile & Contact Info"),
       ),
       body: SingleChildScrollView(
         padding: AppStyles.paddingPage,
@@ -130,12 +170,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      "Edit Your Details",
+                      "Profile and Contact Info",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accentGold),
                     ),
                     SizedBox(height: 4),
                     Text(
-                      "Keep your profile accurate to receive personalized psychic readings and horoscope insights.",
+                      "Update your personal profile, address, and contact details in sync with your account.",
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondaryDark),
                     ),
                   ],
@@ -199,7 +239,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Expanded(
                     child: CustomTextField(
                       controller: _phoneController,
-                      labelText: "Phone Number",
+                      labelText: "Mobile Number",
                       prefixIcon: Icons.phone_android_outlined,
                       keyboardType: TextInputType.phone,
                     ),
@@ -259,8 +299,62 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
               const SizedBox(height: 16),
 
+              // Address Section (Matching Angular customer-dashboard-profile)
+              const Text("Address Details", style: TextStyle(color: AppColors.accentGold, fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+
+              CustomTextField(
+                controller: _streetController,
+                labelText: "Street Address",
+                prefixIcon: Icons.home_outlined,
+              ),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: CustomTextField(
+                      controller: _cityController,
+                      labelText: "City",
+                      prefixIcon: Icons.location_city_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: CustomTextField(
+                      controller: _stateController,
+                      labelText: "State / Province",
+                      prefixIcon: Icons.map_outlined,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              CustomTextField(
+                controller: _zipController,
+                labelText: "Postal / Zip Code",
+                prefixIcon: Icons.markunread_mailbox_outlined,
+              ),
+
+              const SizedBox(height: 16),
+
+              // About / User Description
+              const Text("About & Spiritual Intentions", style: TextStyle(color: AppColors.accentGold, fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              CustomTextField(
+                controller: _bioController,
+                labelText: "User Description / Bio",
+                prefixIcon: Icons.description_outlined,
+                maxLines: 3,
+              ),
+
+              const SizedBox(height: 16),
+
               // Gender Selector
-              const Text("Gender *", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.bold)),
+              const Text("Gender", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,

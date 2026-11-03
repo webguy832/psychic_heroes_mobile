@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_styles.dart';
+import '../../providers/home_provider.dart';
 import '../../providers/session_provider.dart';
+import '../../providers/user_provider.dart';
 import '../advisors/live_session_screen.dart';
 import '../shared/app_footer_widget.dart';
 
@@ -16,44 +19,63 @@ class AdvisorMessagesScreen extends StatefulWidget {
 class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
   String _searchQuery = "";
 
-  final List<Map<String, dynamic>> _mockThreads = [
-    {
-      'id': 'adv_101',
-      'name': 'Psychic Serena',
-      'specialty': 'Love & Soulmate Specialist',
-      'lastMessage': 'Thank you for our wonderful session! Your energy is glowing...',
-      'time': '2m ago',
-      'unread': 1,
-      'isOnline': true,
-      'avatarColor': AppColors.accentPurple,
-    },
-    {
-      'id': 'adv_102',
-      'name': 'Master Orion',
-      'specialty': 'Vedic Astrology & Tarot Master',
-      'lastMessage': 'Your astrology planetary chart analysis has been updated.',
-      'time': '1h ago',
-      'unread': 0,
-      'isOnline': true,
-      'avatarColor': AppColors.primary,
-    },
-    {
-      'id': 'adv_103',
-      'name': 'Tarot Empress Elena',
-      'specialty': 'Tarot & Spiritual Guidance',
-      'lastMessage': 'The Star card came up strongly in your spread today.',
-      'time': 'Yesterday',
-      'unread': 0,
-      'isOnline': false,
-      'avatarColor': Colors.indigo,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final homeProv = Provider.of<HomeProvider>(context, listen: false);
+      if (homeProv.advisors.isEmpty) {
+        homeProv.fetchAdvisors();
+      }
+      Provider.of<UserProvider>(context, listen: false).fetchReadingHistory();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final homeProv = Provider.of<HomeProvider>(context);
+    final userProv = Provider.of<UserProvider>(context);
     final sessionProv = Provider.of<SessionProvider>(context, listen: false);
 
-    final filteredThreads = _mockThreads.where((t) {
+    // Build threads dynamically from reading history + available advisors
+    final List<Map<String, dynamic>> dynamicThreads = [];
+    final seenAdvisorNames = <String>{};
+
+    for (var r in userProv.readingHistory) {
+      if (!seenAdvisorNames.contains(r.advisorName)) {
+        seenAdvisorNames.add(r.advisorName);
+        dynamicThreads.add({
+          'id': r.id,
+          'name': r.advisorName,
+          'specialty': r.type,
+          'lastMessage': r.summary.isNotEmpty ? r.summary : 'Completed session with ${r.advisorName}',
+          'time': r.date,
+          'unread': 0,
+          'isOnline': true,
+          'photo': null,
+          'avatarColor': AppColors.accentGold,
+        });
+      }
+    }
+
+    for (var adv in homeProv.advisors) {
+      if (!seenAdvisorNames.contains(adv.name)) {
+        seenAdvisorNames.add(adv.name);
+        dynamicThreads.add({
+          'id': adv.id,
+          'name': adv.name,
+          'specialty': adv.categoryName ?? 'Spiritual Psychic Advisor',
+          'lastMessage': (adv.bio != null && adv.bio!.isNotEmpty) ? adv.bio! : 'Available for live chat and guidance session.',
+          'time': adv.status.toLowerCase() == 'online' ? 'Online Now' : 'Offline',
+          'unread': 0,
+          'isOnline': adv.status.toLowerCase() == 'online',
+          'photo': adv.profilePhoto,
+          'avatarColor': AppColors.primary,
+        });
+      }
+    }
+
+    final filteredThreads = dynamicThreads.where((t) {
       if (_searchQuery.isEmpty) return true;
       return t['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
           t['specialty'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
@@ -133,10 +155,17 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
                                     CircleAvatar(
                                       radius: 24,
                                       backgroundColor: thread['avatarColor'] as Color,
-                                      child: Text(
-                                        (thread['name'] as String)[0],
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                                      ),
+                                      backgroundImage: (thread['photo'] != null && (thread['photo'] as String).isNotEmpty)
+                                          ? NetworkImage((thread['photo'] as String).startsWith('http')
+                                              ? (thread['photo'] as String)
+                                              : '${ApiEndpoints.imageBaseUrl}${thread['photo']}')
+                                          : null,
+                                      child: (thread['photo'] == null || (thread['photo'] as String).isEmpty)
+                                          ? Text(
+                                              (thread['name'] as String)[0],
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                                            )
+                                          : null,
                                     ),
                                     if (thread['isOnline'] == true)
                                       Positioned(

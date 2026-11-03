@@ -130,24 +130,89 @@ class ApiClient {
         { "id": 104, "name": "Psychic Luna", "categoryName": "Love & Relationships", "rating": 4.9, "reviewsCount": 176, "pricePerMinute": 3.49, "status": "Online", "profilePhoto": null, "bio": "Empathetic guide focusing on emotional healing and relationship harmony." }
       ];
     }
-    if (endpoint.contains('GetUserProfile')) {
+    if (endpoint.contains('GetUserProfile') || endpoint.contains('user/profile')) {
       return {
-        "id": 1,
-        "fullName": "PsychicHeroes Client",
-        "email": "client@psychicheroes.com",
-        "phoneNumber": "+1 555-0192",
-        "balance": 25.00,
-        "role": "Customer"
+        "id": "8843249c-cf72-427b-bef7-6549199f2643",
+        "userId": "8843249c-cf72-427b-bef7-6549199f2643",
+        "screenName": "Sanjeev User",
+        "firstName": "sanjeev",
+        "lastName": "user",
+        "fullName": "Sanjeev User",
+        "email": "sanjeev@user.com",
+        "phoneNumber": "+919813022123",
+        "gender": "Male",
+        "dateOfBirth": "1995-05-15",
+        "addressStreet": "old street",
+        "addressCity": "Delhi",
+        "addressState": "Delhi",
+        "addressZip": "110001",
+        "addressCountry": "India",
+        "walletBalance": 27.85,
+        "freeMinutes": 0,
+        "karmaPoints": 130,
+        "currentStreak": 1,
+        "tierLevel": "Mystic Member",
+        "role": "Customer",
+        "affiliateLink": "https://psychicheroes.online/ref/sanjeev",
+        "userDescription": "about"
       };
+    }
+    if (endpoint.contains('GetBalanceInQuery') || endpoint.contains('user/balance')) {
+      return {
+        "balance": 27.85,
+        "minsBalance": 0,
+        "freeMinutes": 0,
+        "totalPoints": 130,
+        "pointsBalance": 130,
+        "currentStreak": 1,
+        "tierLevel": "Mystic Member"
+      };
+    }
+    if (endpoint.contains('wallet/transactions') || endpoint.contains('Transactions')) {
+      return [
+        {
+          "id": "TXN-2500",
+          "transactionId": "TXN-2500",
+          "transId": 2500,
+          "title": "Fees charged for Call with Sanjeev Advisor",
+          "description": "Fees charged for Call with Sanjeev Advisor",
+          "transactionType": "Debit",
+          "type": "debit",
+          "amount": 0.49,
+          "credit": 0.0,
+          "debit": 0.49,
+          "balance": 27.85,
+          "minsBalance": 0.0,
+          "status": "Completed",
+          "createdAt": "2026-07-10T12:03:30.122Z",
+          "date": "July 10, 2026 • 12:03 PM"
+        }
+      ];
+    }
+    if (endpoint.contains('ReadingHistory')) {
+      return [
+        {
+          "id": "REQ-2500",
+          "title": "Voice Call Consultation",
+          "advisorName": "Sanjeev Advisor",
+          "type": "Voice Call",
+          "typeKey": "voice",
+          "duration": "10 mins",
+          "date": "July 10, 2026 • 12:03 PM",
+          "cost": 0.49,
+          "rating": 5,
+          "summary": "Life clarity and spiritual guidance session."
+        }
+      ];
     }
     if (endpoint.contains('login')) {
       return {
         "success": true,
-        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.psychicheroes_demo_token",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.psychicheroes_staging_token",
         "user": {
-          "id": 1,
-          "fullName": "Demo User",
-          "email": "user@psychicheroes.com",
+          "id": "8843249c-cf72-427b-bef7-6549199f2643",
+          "fullName": "Sanjeev User",
+          "email": "sanjeev@user.com",
           "role": "Customer"
         }
       };
@@ -161,11 +226,11 @@ class ApiClient {
     }
     if (endpoint.contains('SignUpUsingVerificationCode')) {
       return {
-        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.psychicheroes_demo_token",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.psychicheroes_staging_token",
         "user": {
-          "id": 2,
-          "fullName": "New Customer",
-          "email": "newuser@psychicheroes.com",
+          "id": "8843249c-cf72-427b-bef7-6549199f2643",
+          "fullName": "Sanjeev User",
+          "email": "sanjeev@user.com",
           "role": "Customer"
         }
       };

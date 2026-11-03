@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_styles.dart';
@@ -14,14 +15,22 @@ class ReferralScreen extends StatefulWidget {
 }
 
 class _ReferralScreenState extends State<ReferralScreen> {
-  final String _referralCode = "PSYCHIC-HERO-789";
-
   final List<Map<String, dynamic>> _rewardItems = [
     {'title': '5 Free Reading Minutes', 'points': 250, 'icon': Icons.timer_rounded, 'badge': 'Popular'},
     {'title': '\$10 Wallet Top-Up Credit', 'points': 500, 'icon': Icons.account_balance_wallet_rounded, 'badge': 'Best Value'},
     {'title': 'Tarot Card 3-Spread Deck', 'points': 150, 'icon': Icons.style_rounded, 'badge': 'Bonus'},
     {'title': 'VIP Gold Advisor Badge', 'points': 800, 'icon': Icons.workspace_premium_rounded, 'badge': 'Exclusive'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProv = Provider.of<UserProvider>(context, listen: false);
+      userProv.fetchUserProfile();
+      userProv.fetchTransactions();
+    });
+  }
 
   void _claimReward(Map<String, dynamic> item, UserProvider userProv) {
     final pointsNeeded = item['points'] as int;
@@ -67,6 +76,26 @@ class _ReferralScreenState extends State<ReferralScreen> {
   @override
   Widget build(BuildContext context) {
     final userProv = Provider.of<UserProvider>(context);
+    final u = userProv.user;
+
+    final referralCode = (u?.screenName != null && u!.screenName!.isNotEmpty)
+        ? u.screenName!
+        : (u?.id != null && u!.id.isNotEmpty
+            ? (u.id.length > 8 ? u.id.substring(0, 8).toUpperCase() : u.id.toUpperCase())
+            : "HERO10");
+
+    final referralLink = (u?.affiliateLink != null && u!.affiliateLink!.isNotEmpty)
+        ? u.affiliateLink!
+        : "https://psychicheroes.com/register?ref=$referralCode";
+
+    double referralEarned = 0.0;
+    int referralCount = 0;
+    for (var t in userProv.transactions) {
+      if (t.transType.toLowerCase().contains("referral") || t.description.toLowerCase().contains("referral")) {
+        referralEarned += t.credit;
+        referralCount += 1;
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -118,11 +147,11 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildStatTile("Total Earned", "\$30.00", Icons.payments_rounded, AppColors.onlineGreen),
+                        child: _buildStatTile("Total Earned", "\$${referralEarned.toStringAsFixed(2)}", Icons.payments_rounded, AppColors.onlineGreen),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildStatTile("Friends Joined", "3 Friends", Icons.people_alt_rounded, AppColors.accentCyan),
+                        child: _buildStatTile("Friends Joined", "$referralCount ${referralCount == 1 ? 'Friend' : 'Friends'}", Icons.people_alt_rounded, AppColors.accentCyan),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -153,7 +182,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                             border: Border.all(color: AppColors.borderDark),
                           ),
                           child: SelectableText(
-                            _referralCode,
+                            referralCode,
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.accentGold, letterSpacing: 2),
                           ),
                         ),
@@ -165,8 +194,9 @@ class _ReferralScreenState extends State<ReferralScreen> {
                                 text: "Copy Code",
                                 icon: Icons.copy_rounded,
                                 onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: referralCode));
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Referral code copied to clipboard!"), backgroundColor: AppColors.successGreen),
+                                    SnackBar(content: Text("Referral code '$referralCode' copied to clipboard!"), backgroundColor: AppColors.successGreen),
                                   );
                                 },
                               ),
@@ -178,8 +208,9 @@ class _ReferralScreenState extends State<ReferralScreen> {
                                 icon: Icons.share_rounded,
                                 backgroundColor: AppColors.accentCyan,
                                 onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: referralLink));
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Opening share dialog..."), backgroundColor: AppColors.accentCyan),
+                                    SnackBar(content: Text("Referral link copied to clipboard: $referralLink"), backgroundColor: AppColors.accentCyan),
                                   );
                                 },
                               ),

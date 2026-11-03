@@ -32,6 +32,10 @@ class ApiEndpoints {
   static const String createBillingAddress = "api/UserBillingAddress";
   static String updateBillingAddress(int id) => "api/UserBillingAddress/$id";
 
+  // Wallet & Session Endpoints
+  static const String walletTransactions = "api/wallet/transactions";
+  static const String readingHistory = "api/User/ReadingHistory";
+
   // Packages & Payment Endpoints (Exact matching web_angular_2025)
   static const String getAllPackages = "api/web/GetAllPackages";
   static const String userStatus = "api/user/status";

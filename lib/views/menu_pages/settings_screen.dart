@@ -67,19 +67,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         CircleAvatar(
                           radius: 24,
                           backgroundColor: AppColors.primary,
-                          child: Text(
-                            (user?.displayName.isNotEmpty == true) ? user!.displayName[0].toUpperCase() : 'P',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
-                          ),
+                          backgroundImage: user?.profilePhoto != null && user!.profilePhoto!.isNotEmpty
+                              ? NetworkImage(user.profilePhoto!.startsWith('http') ? user.profilePhoto! : 'https://psychicheroes.com/${user.profilePhoto}')
+                              : null,
+                          child: (user?.profilePhoto == null || user!.profilePhoto!.isEmpty)
+                              ? Text(
+                                  (user?.displayName.isNotEmpty == true)
+                                      ? user!.displayName[0].toUpperCase()
+                                      : (user?.screenName?.isNotEmpty == true ? user!.screenName![0].toUpperCase() : 'U'),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
+                                )
+                              : null,
                         ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(user?.displayName ?? "Mystic User", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                              Text(
+                                user?.displayName.isNotEmpty == true
+                                    ? user!.displayName
+                                    : (user?.screenName?.isNotEmpty == true ? user!.screenName! : "Member"),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                              ),
                               const SizedBox(height: 2),
-                              Text(user?.email ?? "user@psychicheroes.com", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                              Text(user?.email ?? "", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
                             ],
                           ),
                         ),

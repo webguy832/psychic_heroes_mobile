@@ -144,6 +144,15 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   }
 
   Widget _buildProfileHeaderCard(SessionProvider sessionProv, dynamic user) {
+    final name = (user != null && user.displayName != null && user.displayName.isNotEmpty)
+        ? user.displayName
+        : (user?.screenName != null && user.screenName.isNotEmpty ? user.screenName : "Advisor");
+    final initial = (name != null && name.isNotEmpty) ? name[0].toUpperCase() : 'A';
+    final photo = user?.profilePhoto;
+    final bio = (user?.userDescription != null && user.userDescription.isNotEmpty)
+        ? user.userDescription
+        : "Spiritual Psychic Advisor & Intuitive Guide";
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -158,10 +167,15 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           CircleAvatar(
             radius: 30,
             backgroundColor: AppColors.bgDarkCard,
-            child: const Text(
-              "S",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.accentGold),
-            ),
+            backgroundImage: (photo != null && photo.isNotEmpty)
+                ? NetworkImage(photo.startsWith('http') ? photo : 'https://psychicheroes.com/$photo')
+                : null,
+            child: (photo == null || photo.isEmpty)
+                ? Text(
+                    initial,
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.accentGold),
+                  )
+                : null,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -170,18 +184,23 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      "Sanjeev Advisor",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    Flexible(
+                      child: Text(
+                        name ?? "Advisor",
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     const Icon(Icons.verified_rounded, color: AppColors.accentGold, size: 18),
                   ],
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  "Tarot, Psychic Reading & Astrology",
-                  style: TextStyle(fontSize: 12, color: AppColors.textPrimaryDark),
+                Text(
+                  bio,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimaryDark),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -196,7 +215,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                         children: const [
                           Icon(Icons.star_rounded, color: AppColors.accentGold, size: 14),
                           SizedBox(width: 4),
-                          Text("5.0 (154 Reviews)", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text("5.0 ★ Verified", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -397,14 +416,32 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   }
 
   Widget _buildRecentSessionsList() {
-    final recentSessions = [
-      {"client": "Sanjeev User", "type": "Live Voice Call", "duration": "08:14 mins", "earned": "\$32.80", "time": "15 mins ago"},
-      {"client": "Elena Rostova", "type": "Live Chat Session", "duration": "12:30 mins", "earned": "\$49.85", "time": "2 hours ago"},
-      {"client": "Michael Thorne", "type": "Live Voice Call", "duration": "05:45 mins", "earned": "\$22.90", "time": "5 hours ago"},
-    ];
+    final userProv = Provider.of<UserProvider>(context);
+    final history = userProv.readingHistory;
+
+    if (history.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.bgDarkCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderDark),
+        ),
+        child: Column(
+          children: const [
+            Icon(Icons.history_edu_rounded, color: AppColors.textSecondaryDark, size: 36),
+            SizedBox(height: 8),
+            Text("No Client Sessions Yet", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            SizedBox(height: 4),
+            Text("Completed readings will be recorded here automatically.", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+          ],
+        ),
+      );
+    }
 
     return Column(
-      children: recentSessions.map((s) {
+      children: history.take(5).map((s) {
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),
@@ -425,16 +462,16 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s["client"]!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
-                    Text("${s["type"]} • ${s["duration"]}", style: const TextStyle(fontSize: 11, color: AppColors.textPrimaryDark)),
+                    Text(s.advisorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                    Text("${s.type} • ${s.duration}", style: const TextStyle(fontSize: 11, color: AppColors.textPrimaryDark)),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(s["earned"]!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.onlineGreen)),
-                  Text(s["time"]!, style: const TextStyle(fontSize: 10, color: AppColors.textPrimaryDark)),
+                  Text("\$${s.cost.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.onlineGreen)),
+                  Text(s.date, style: const TextStyle(fontSize: 10, color: AppColors.textPrimaryDark)),
                 ],
               ),
             ],
