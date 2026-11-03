@@ -91,7 +91,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
     double referralEarned = 0.0;
     int referralCount = 0;
     for (var t in userProv.transactions) {
-      if (t.transType.toLowerCase().contains("referral") || t.description.toLowerCase().contains("referral")) {
+      if (t.transactionType.toLowerCase().contains("referral") || t.description.toLowerCase().contains("referral")) {
         referralEarned += t.credit;
         referralCount += 1;
       }

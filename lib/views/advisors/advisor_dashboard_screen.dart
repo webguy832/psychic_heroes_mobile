@@ -403,7 +403,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               final user = Provider.of<UserProvider>(context, listen: false).user;
               sessionProv.initiateSessionRequest(
                 clientId: user?.id ?? "client",
-                clientName: (user?.displayName != null && user!.displayName.isNotEmpty) ? user.displayName : "Client",
+                clientName: user?.displayName ?? "Client",
                 advisorId: "advisor",
                 advisorName: "Advisor",
                 type: SessionType.call,

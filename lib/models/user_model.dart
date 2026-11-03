@@ -227,6 +227,8 @@ class TransactionHistoryDto {
   final String createdAt;
   final String date;
 
+  String get transType => transactionType;
+
   TransactionHistoryDto({
     required this.id,
     required this.transactionId,

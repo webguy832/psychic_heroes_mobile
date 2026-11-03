@@ -174,9 +174,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                   final user = Provider.of<UserProvider>(context, listen: false).user;
                   sessionProv.initiateSessionRequest(
                     clientId: user?.id ?? "",
-                    clientName: (user?.displayName != null && user!.displayName.isNotEmpty)
-                        ? user.displayName
-                        : ((user?.fullName != null && user!.fullName.isNotEmpty) ? user.fullName : "User"),
+                    clientName: user?.displayName ?? "User",
                     advisorId: widget.advisor.id.toString(),
                     advisorName: widget.advisor.name,
                     type: mode.toUpperCase().contains("VIDEO")

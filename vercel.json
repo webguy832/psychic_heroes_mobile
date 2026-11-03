@@ -1,10 +1,11 @@
 {
   "version": 2,
   "framework": null,
-  "buildCommand": null,
-  "outputDirectory": null,
+  "installCommand": "npm install && (if [ -d flutter ]; then cd flutter && git pull && cd .. ; else git clone --depth 1 -b stable https://github.com/flutter/flutter.git; fi)",
+  "buildCommand": "export PATH=\"$PATH:$(pwd)/flutter/bin\" && flutter config --no-analytics && flutter build web --release",
+  "outputDirectory": "build/web",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/(.*)", "destination": "/api/index.js" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
