@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_endpoints.dart';
 
@@ -61,7 +60,6 @@ class SessionProvider extends ChangeNotifier {
   List<ChatMessageItem> _chatMessages = [];
   
   Timer? _sessionTimer;
-  Timer? _pollingTimer;
   int _elapsedSeconds = 0;
   bool _isMuted = false;
   bool _isSpeakerOn = true;
@@ -83,14 +81,11 @@ class SessionProvider extends ChangeNotifier {
   double get totalEarningsToday => _totalEarningsToday;
   int get completedSessionsToday => _completedSessionsToday;
 
-  SessionProvider() {
-    _startPollingSessionState();
-  }
+  SessionProvider();
 
   @override
   void dispose() {
     _sessionTimer?.cancel();
-    _pollingTimer?.cancel();
     super.dispose();
   }
 
@@ -109,7 +104,7 @@ class SessionProvider extends ChangeNotifier {
     return ((_elapsedSeconds - 45) ~/ 60) + 1;
   }
 
-  /// Current session cost based on 45-second charging logic
+  /// Current session cost = billedMinutes * ratePerMinute
   double get currentSessionCost {
     final rate = _activeRequest?.ratePerMinute ?? 3.99;
     return (billedMinutes * rate);
@@ -141,215 +136,7 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _syncMessagesFromList(List<dynamic>? rawList) {
-    if (rawList == null) return;
-    bool hasNew = false;
-    for (var m in rawList) {
-      if (m is Map) {
-        final msgId = m['id']?.toString() ?? '';
-        if (msgId.isNotEmpty && !_chatMessages.any((x) => x.id == msgId)) {
-          DateTime ts = DateTime.now();
-          if (m['timestamp'] != null) {
-            try {
-              ts = DateTime.parse(m['timestamp'].toString());
-            } catch (_) {}
-          }
-          _chatMessages.add(ChatMessageItem(
-            id: msgId,
-            senderId: m['senderId']?.toString() ?? '',
-            senderName: m['senderName']?.toString() ?? '',
-            message: m['message']?.toString() ?? '',
-            timestamp: ts,
-            isAdvisor: m['isAdvisor'] == true,
-          ));
-          hasNew = true;
-        }
-      }
-    }
-    if (hasNew) {
-      notifyListeners();
-    }
-  }
-
-  void _startPollingSessionState() {
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) async {
-      // 1. Check local storage cache for instant cross-tab sync
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final localData = prefs.getString('active_live_session');
-        if (localData != null && localData.isNotEmpty) {
-          final session = json.decode(localData);
-          if (session['messages'] != null) {
-            _syncMessagesFromList(session['messages']);
-          }
-
-          final status = session['status'];
-          final reqId = session['id'] ?? 'req_1';
-          final clientName = session['clientName'] ?? 'Client';
-          final advisorName = session['advisorName'] ?? 'Advisor';
-          final typeStr = (session['type'] ?? 'chat').toString().toLowerCase();
-          final type = typeStr.contains('video')
-              ? SessionType.video
-              : (typeStr.contains('call') || typeStr.contains('voice') ? SessionType.call : SessionType.chat);
-
-          final item = SessionRequestItem(
-            id: reqId,
-            clientId: session['clientId'] ?? 'client_1',
-            clientName: clientName,
-            advisorId: session['advisorId'] ?? '101',
-            advisorName: advisorName,
-            type: type,
-            ratePerMinute: (session['ratePerMinute'] ?? 3.99).toDouble(),
-            createdAt: DateTime.now(),
-          );
-
-          if (status == 'PENDING') {
-            if (!_incomingRequests.any((r) => r.id == reqId)) {
-              _incomingRequests = [item];
-              _activeRequest = item;
-              _sessionType = type;
-              notifyListeners();
-            }
-          } else if (status == 'ACCEPTED') {
-            if (_sessionState == SessionState.waitingForAdvisor || _sessionState == SessionState.idle) {
-              _activeRequest = item;
-              _sessionType = type;
-              _sessionState = SessionState.active;
-              _incomingRequests.clear();
-              if (_chatMessages.isEmpty) {
-                _chatMessages = [
-                  ChatMessageItem(
-                    id: "msg_1",
-                    senderId: item.advisorId,
-                    senderName: advisorName,
-                    message: "Hello $clientName! Welcome to your live session. How can I guide you today?",
-                    timestamp: DateTime.now(),
-                    isAdvisor: true,
-                  )
-                ];
-              }
-              _startSessionTimer();
-              notifyListeners();
-            }
-          } else if (status == 'CANCELLED') {
-            if (_sessionState == SessionState.waitingForAdvisor || _sessionState == SessionState.active) {
-              _sessionState = SessionState.cancelled;
-              _incomingRequests.clear();
-              notifyListeners();
-            }
-          } else if (status == 'ENDED') {
-            if (_sessionState == SessionState.active || _sessionState == SessionState.waitingForAdvisor) {
-              _sessionState = SessionState.ended;
-              _sessionTimer?.cancel();
-              _incomingRequests.clear();
-              notifyListeners();
-            }
-          }
-        }
-      } catch (_) {}
-
-      // 2. Poll API endpoint for remote cross-device sync
-      try {
-        final url = Uri.parse("/api/session-request");
-        final res = await http.get(url).timeout(const Duration(seconds: 3));
-        if (res.statusCode == 200) {
-          final data = json.decode(res.body);
-          final session = data['session'];
-
-          if (session != null) {
-            if (session['messages'] != null) {
-              _syncMessagesFromList(session['messages']);
-            }
-
-            final status = session['status'];
-            final reqId = session['id'] ?? 'req_1';
-            final clientName = session['clientName'] ?? 'Client';
-            final advisorName = session['advisorName'] ?? 'Advisor';
-            final typeStr = (session['type'] ?? 'chat').toString().toLowerCase();
-            final type = typeStr.contains('video')
-                ? SessionType.video
-                : (typeStr.contains('call') || typeStr.contains('voice') ? SessionType.call : SessionType.chat);
-
-            final item = SessionRequestItem(
-              id: reqId,
-              clientId: session['clientId'] ?? 'client_1',
-              clientName: clientName,
-              advisorId: session['advisorId'] ?? '101',
-              advisorName: advisorName,
-              type: type,
-              ratePerMinute: (session['ratePerMinute'] ?? 3.99).toDouble(),
-              createdAt: DateTime.now(),
-            );
-
-            if (status == 'PENDING') {
-              if (!_incomingRequests.any((r) => r.id == reqId)) {
-                _incomingRequests = [item];
-                _activeRequest = item;
-                _sessionType = type;
-                notifyListeners();
-              }
-            } else if (status == 'ACCEPTED') {
-              if (_sessionState == SessionState.waitingForAdvisor || _sessionState == SessionState.idle) {
-                _activeRequest = item;
-                _sessionType = type;
-                _sessionState = SessionState.active;
-                _incomingRequests.clear();
-                if (_chatMessages.isEmpty) {
-                  _chatMessages = [
-                    ChatMessageItem(
-                      id: "msg_1",
-                      senderId: item.advisorId,
-                      senderName: advisorName,
-                      message: "Hello $clientName! Welcome to your live session. How can I guide you today?",
-                      timestamp: DateTime.now(),
-                      isAdvisor: true,
-                    )
-                  ];
-                }
-                _startSessionTimer();
-                notifyListeners();
-              }
-            } else if (status == 'CANCELLED') {
-              if (_sessionState == SessionState.waitingForAdvisor || _sessionState == SessionState.active) {
-                _sessionState = SessionState.cancelled;
-                _incomingRequests.clear();
-                notifyListeners();
-              }
-            } else if (status == 'ENDED') {
-              if (_sessionState == SessionState.active || _sessionState == SessionState.waitingForAdvisor) {
-                _sessionState = SessionState.ended;
-                _sessionTimer?.cancel();
-                _incomingRequests.clear();
-                notifyListeners();
-              }
-            }
-          } else {
-            if (_sessionState == SessionState.active || _sessionState == SessionState.waitingForAdvisor) {
-              _sessionState = SessionState.ended;
-              _sessionTimer?.cancel();
-              _incomingRequests.clear();
-              notifyListeners();
-            }
-          }
-        }
-      } catch (_) {}
-
-      // 3. Poll session messages endpoint
-      try {
-        final msgUrl = Uri.parse("/api/session-messages");
-        final msgRes = await http.get(msgUrl).timeout(const Duration(seconds: 3));
-        if (msgRes.statusCode == 200) {
-          final msgData = json.decode(msgRes.body);
-          if (msgData['messages'] != null) {
-            _syncMessagesFromList(msgData['messages']);
-          }
-        }
-      } catch (_) {}
-    });
-  }
-
-  // User initiates Chat/Call -> Status = waitingForAdvisor & POST to API / Save Local
+  // User initiates Chat/Call -> Status = waitingForAdvisor & Save Local
   void initiateSessionRequest({
     required String clientId,
     required String clientName,
@@ -412,15 +199,6 @@ class SessionProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('active_live_session', json.encode(sessionMap));
     } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-request");
-      await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(sessionMap),
-      );
-    } catch (_) {}
   }
 
   void startDemoSession({
@@ -441,7 +219,7 @@ class SessionProvider extends ChangeNotifier {
     );
   }
 
-  // Advisor accepts the request -> Status = active & POST to session-accept
+  // Advisor accepts the request -> Status = active
   void acceptSessionRequest(SessionRequestItem req) async {
     req.isAccepted = true;
     _activeRequest = req;
@@ -453,9 +231,11 @@ class SessionProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final localData = prefs.getString('active_live_session');
-      Map<String, dynamic> sessionMap = {
+      final sessionMap = {
         'id': req.id,
+        'clientId': req.clientId,
         'clientName': req.clientName,
+        'advisorId': req.advisorId,
         'advisorName': req.advisorName,
         'type': req.type == SessionType.video ? 'video' : (req.type == SessionType.call ? 'call' : 'chat'),
         'status': 'ACCEPTED',
@@ -468,14 +248,9 @@ class SessionProvider extends ChangeNotifier {
       }
       await prefs.setString('active_live_session', json.encode(sessionMap));
     } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-accept");
-      await http.post(url);
-    } catch (_) {}
   }
 
-  // Advisor declines request -> POST to session-cancel
+  // Advisor declines request
   void declineSessionRequest(SessionRequestItem req) async {
     _incomingRequests.clear();
     _activeRequest = null;
@@ -486,14 +261,9 @@ class SessionProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('active_live_session', json.encode({'status': 'CANCELLED'}));
     } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-cancel");
-      await http.post(url);
-    } catch (_) {}
   }
 
-  // User cancels request while waiting -> POST to session-cancel
+  // User cancels request while waiting
   void cancelSessionRequest() async {
     _incomingRequests.clear();
     _activeRequest = null;
@@ -503,11 +273,6 @@ class SessionProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('active_live_session', json.encode({'status': 'CANCELLED'}));
-    } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-cancel");
-      await http.post(url);
     } catch (_) {}
   }
 
@@ -526,55 +291,40 @@ class SessionProvider extends ChangeNotifier {
     required String message,
     required bool isAdvisor,
   }) async {
-    if (message.trim().isEmpty) return;
-
     final newMsg = ChatMessageItem(
       id: "msg_${DateTime.now().millisecondsSinceEpoch}",
       senderId: senderId,
       senderName: senderName,
-      message: message.trim(),
+      message: message,
       timestamp: DateTime.now(),
       isAdvisor: isAdvisor,
     );
 
-    if (!_chatMessages.any((m) => m.id == newMsg.id)) {
-      _chatMessages.add(newMsg);
-      notifyListeners();
-    }
+    _chatMessages.add(newMsg);
+    notifyListeners();
 
     final msgMap = {
       'id': newMsg.id,
-      'senderId': newMsg.senderId,
-      'senderName': newMsg.senderName,
-      'message': newMsg.message,
+      'senderId': senderId,
+      'senderName': senderName,
+      'message': message,
       'timestamp': newMsg.timestamp.toIso8601String(),
-      'isAdvisor': newMsg.isAdvisor,
+      'isAdvisor': isAdvisor,
     };
 
-    // 1. Save to SharedPreferences for instant cross-tab sync
     try {
       final prefs = await SharedPreferences.getInstance();
       final localData = prefs.getString('active_live_session');
       Map<String, dynamic> sessionMap = {};
       if (localData != null && localData.isNotEmpty) {
-        sessionMap = Map<String, dynamic>.from(json.decode(localData));
+        sessionMap = json.decode(localData);
       }
-      List<dynamic> msgs = sessionMap['messages'] is List ? List.from(sessionMap['messages']) : [];
-      if (!msgs.any((m) => m is Map && m['id'] == newMsg.id)) {
+      List msgs = sessionMap['messages'] ?? [];
+      if (!msgs.any((m) => m['id'] == newMsg.id)) {
         msgs.add(msgMap);
       }
       sessionMap['messages'] = msgs;
       await prefs.setString('active_live_session', json.encode(sessionMap));
-    } catch (_) {}
-
-    // 2. Post message to remote API for cross-device sync
-    try {
-      final url = Uri.parse("/api/session-messages");
-      await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(msgMap),
-      );
     } catch (_) {}
   }
 
@@ -596,20 +346,6 @@ class SessionProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('active_live_session', json.encode(endPayload));
     } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-end");
-      await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(endPayload),
-      );
-    } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-request");
-      await http.delete(url);
-    } catch (_) {}
   }
 
   void resetSession() async {
@@ -623,11 +359,6 @@ class SessionProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('active_live_session');
-    } catch (_) {}
-
-    try {
-      final url = Uri.parse("/api/session-request");
-      await http.delete(url);
     } catch (_) {}
   }
 }

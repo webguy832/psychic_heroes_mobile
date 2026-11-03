@@ -1,11 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 class ApiEndpoints {
-  // Base Backend API URL (matching web_angular_2025: https://psychicheroes.online/)
-  // On native mobile (iOS / Android), calls direct https://psychicheroes.online/
-  // On web browser, uses same-origin relative URL proxied to https://psychicheroes.online/ to bypass browser CORS
-  static String get baseUrl => kIsWeb ? "" : "https://psychicheroes.online/";
-
+  // Base Backend API URL strictly pointing to https://psychicheroes.online/ (matching web_angular_2025)
+  static const String baseUrl = "https://psychicheroes.online/";
   static const String directBackendUrl = "https://psychicheroes.online/";
   static const String imageBaseUrl = "https://psychicheroes.online/";
   static const String bannerBaseUrl = "https://psychicheroes.online/Content/Psychic/images/banners/";

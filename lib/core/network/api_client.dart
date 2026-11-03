@@ -22,12 +22,10 @@ class ApiClient {
 
   static Uri _buildUri(String path, [Map<String, String>? queryParameters]) {
     final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    if (ApiEndpoints.baseUrl.isEmpty) {
-      return Uri.parse('/$cleanPath').replace(queryParameters: queryParameters);
-    }
-    final fullPath = ApiEndpoints.baseUrl.endsWith('/')
-        ? '${ApiEndpoints.baseUrl}$cleanPath'
-        : '${ApiEndpoints.baseUrl}/$cleanPath';
+    final base = (ApiEndpoints.baseUrl.isNotEmpty ? ApiEndpoints.baseUrl : "https://psychicheroes.online/").endsWith('/')
+        ? (ApiEndpoints.baseUrl.isNotEmpty ? ApiEndpoints.baseUrl : "https://psychicheroes.online/")
+        : '${ApiEndpoints.baseUrl}/';
+    final fullPath = '$base$cleanPath';
     return Uri.parse(fullPath).replace(queryParameters: queryParameters);
   }
 
