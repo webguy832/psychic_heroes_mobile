@@ -77,8 +77,8 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
     final activeReq = sessionProv.activeRequest;
 
     final titleName = widget.isAdvisorView
-        ? (activeReq?.clientName ?? "Sanjeev User")
-        : (activeReq?.advisorName ?? "Sanjeev Advisor");
+        ? (activeReq?.clientName ?? "Client")
+        : (activeReq?.advisorName ?? "Advisor");
 
     _checkAutoClose(sessionProv, titleName);
 
@@ -528,8 +528,8 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
               ),
               onPressed: () {
                 sessionProv.sendChatMessage(
-                  senderId: "advisor_101",
-                  senderName: "Sanjeev Advisor",
+                  senderId: sessionProv.activeRequest?.advisorId ?? "advisor",
+                  senderName: sessionProv.activeRequest?.advisorName ?? "Advisor",
                   message: quickTexts[i],
                   isAdvisor: true,
                 );
@@ -590,8 +590,8 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
     if (text.isEmpty) return;
 
     sessionProv.sendChatMessage(
-      senderId: widget.isAdvisorView ? "advisor_101" : "user_1",
-      senderName: widget.isAdvisorView ? "Sanjeev Advisor" : userName,
+      senderId: widget.isAdvisorView ? (sessionProv.activeRequest?.advisorId ?? "advisor") : (sessionProv.activeRequest?.clientId ?? "user"),
+      senderName: widget.isAdvisorView ? (sessionProv.activeRequest?.advisorName ?? "Advisor") : userName,
       message: text,
       isAdvisor: widget.isAdvisorView,
     );
@@ -621,8 +621,8 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
             onPressed: () {
               final activeReq = sessionProv.activeRequest;
               final titleName = widget.isAdvisorView
-                  ? (activeReq?.clientName ?? "Sanjeev User")
-                  : (activeReq?.advisorName ?? "Sanjeev Advisor");
+                  ? (activeReq?.clientName ?? "Client")
+                  : (activeReq?.advisorName ?? "Advisor");
               final timeStr = sessionProv.formattedTimer;
               final costVal = sessionProv.currentSessionCost;
               sessionProv.endSession();

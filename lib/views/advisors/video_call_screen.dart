@@ -78,8 +78,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final activeReq = sessionProv.activeRequest;
 
     final titleName = widget.isAdvisorView
-        ? (activeReq?.clientName ?? "Sanjeev User")
-        : (activeReq?.advisorName ?? "Sanjeev Advisor");
+        ? (activeReq?.clientName ?? "Client")
+        : (activeReq?.advisorName ?? "Advisor");
 
     _checkAutoClose(sessionProv, titleName);
 
@@ -529,8 +529,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     if (text.isEmpty) return;
 
     sessionProv.sendChatMessage(
-      senderId: widget.isAdvisorView ? "advisor_101" : "user_1",
-      senderName: widget.isAdvisorView ? "Sanjeev Advisor" : userName,
+      senderId: widget.isAdvisorView ? (sessionProv.activeRequest?.advisorId ?? "advisor") : (sessionProv.activeRequest?.clientId ?? "user"),
+      senderName: widget.isAdvisorView ? (sessionProv.activeRequest?.advisorName ?? "Advisor") : userName,
       message: text,
       isAdvisor: widget.isAdvisorView,
     );

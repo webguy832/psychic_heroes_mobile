@@ -77,8 +77,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     final activeReq = sessionProv.activeRequest;
 
     final titleName = widget.isAdvisorView
-        ? (activeReq?.clientName ?? "Sanjeev User")
-        : (activeReq?.advisorName ?? "Sanjeev Advisor");
+        ? (activeReq?.clientName ?? "Client")
+        : (activeReq?.advisorName ?? "Advisor");
 
     _checkAutoClose(sessionProv, titleName);
 
@@ -392,8 +392,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     if (text.isEmpty) return;
 
     sessionProv.sendChatMessage(
-      senderId: widget.isAdvisorView ? "advisor_101" : "user_1",
-      senderName: widget.isAdvisorView ? "Sanjeev Advisor" : userName,
+      senderId: widget.isAdvisorView ? (sessionProv.activeRequest?.advisorId ?? "advisor") : (sessionProv.activeRequest?.clientId ?? "user"),
+      senderName: widget.isAdvisorView ? (sessionProv.activeRequest?.advisorName ?? "Advisor") : userName,
       message: text,
       isAdvisor: widget.isAdvisorView,
     );

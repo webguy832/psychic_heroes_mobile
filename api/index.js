@@ -51,25 +51,22 @@ module.exports = async (req, res) => {
     }
 
     // 2. Psychic Categories
-    if (pathname.includes('GetPsychicCategories')) {
+    if (pathname.includes('GetPsychicCategories') || pathname.endsWith('/categories')) {
       try {
-        const dbRes = await pool.query(`SELECT * FROM "PsychicCategories" ORDER BY "Id" ASC LIMIT 20`);
+        const dbRes = await pool.query(`SELECT "Id", "Title", "ImageUrl", "Description" FROM "PsychicCategories" WHERE "IsActive" = true ORDER BY "OrderBy" ASC LIMIT 20`);
         if (dbRes.rows.length > 0) {
           const categories = dbRes.rows.map((r, idx) => ({
             id: r.Id || idx + 1,
-            categoryName: r.CategoryName || r.categoryName || "Psychic Reading",
-            icon: r.Icon || r.icon || "🔮",
-            description: r.Description || r.description || "Intuitive guidance"
+            categoryName: r.Title || "Psychic Reading",
+            icon: r.ImageUrl || "🔮",
+            description: r.Description || "Intuitive guidance"
           }));
           return res.status(200).json(categories);
         }
-      } catch (e) { }
-      return res.status(200).json([
-        { id: 1, categoryName: "Psychic Reading", icon: "🔮", description: "Intuitive & spiritual guidance" },
-        { id: 2, categoryName: "Tarot Reading", icon: "🎴", description: "Card spreads & symbolism" },
-        { id: 3, categoryName: "Astrology & Horoscope", icon: "✨", description: "Zodiac alignment & natal charts" },
-        { id: 4, categoryName: "Love & Relationships", icon: "❤️", description: "Soulmate & connection advice" }
-      ]);
+      } catch (e) {
+        console.error("Categories error:", e);
+      }
+      return res.status(200).json([]);
     }
 
     // 3. Home Advisors & Advisors List
@@ -79,21 +76,21 @@ module.exports = async (req, res) => {
         if (dbRes.rows.length > 0) {
           const advisors = dbRes.rows.map((r, idx) => ({
             id: r.Id || idx + 101,
-            name: r.DisplayName || r.Name || r.ScreenName || "Sanjeev Advisor",
+            name: r.DisplayName || r.Name || r.ScreenName || "Advisor",
             categoryName: r.Category || r.CategoryName || "Tarot & Psychic",
             rating: parseFloat(r.Rating || 5.0),
-            reviewsCount: parseInt(r.TotalReviews || r.ReviewsCount || 154),
-            pricePerMinute: parseFloat(r.CallRatePerMinute || r.PricePerMinute || 3.99),
-            status: r.IsOnline ? "Online" : (r.Status || "Online"),
+            reviewsCount: parseInt(r.TotalReviews || r.ReviewsCount || 0),
+            pricePerMinute: parseFloat(r.CallRatePerMinute || r.PricePerMinute || 0),
+            status: r.IsOnline ? "Online" : (r.Status || "Offline"),
             profilePhoto: r.ProfilePhoto || null,
-            bio: r.AboutMyServices || r.BriefDescription || r.Bio || "Master clairvoyant and spiritual advisor."
+            bio: r.AboutMyServices || r.BriefDescription || r.Bio || ""
           }));
           return res.status(200).json(advisors);
         }
-      } catch (e) { }
-      return res.status(200).json([
-        { id: 101, name: "Sanjeev Advisor", categoryName: "Tarot & Psychic", rating: 5.0, reviewsCount: 154, pricePerMinute: 3.99, status: "Online", profilePhoto: null, bio: "Master clairvoyant and spiritual advisor." }
-      ]);
+      } catch (e) {
+        console.error("Advisors error:", e);
+      }
+      return res.status(200).json([]);
     }
 
     // 4. Advisor Details
@@ -101,33 +98,29 @@ module.exports = async (req, res) => {
       const queryId = parsedUrl.query.id;
       try {
         if (queryId) {
-          const dbRes = await pool.query(`SELECT * FROM "AdvisorProfiles" WHERE "Id"::text = $1 OR "DisplayName" ILIKE $2 OR "Name" ILIKE $2 LIMIT 1`, [queryId, `%${queryId}%`]);
+          const dbRes = await pool.query(
+            `SELECT * FROM "AdvisorProfiles" WHERE "Id"::text = $1 OR "DisplayName" ILIKE $2 LIMIT 1`,
+            [queryId, `%${queryId}%`]
+          );
           if (dbRes.rows.length > 0) {
             const r = dbRes.rows[0];
             return res.status(200).json({
               id: r.Id,
-              name: r.DisplayName || r.Name || r.ScreenName || "Sanjeev Advisor",
+              name: r.DisplayName || r.Name || r.ScreenName || "Advisor",
               categoryName: r.Category || r.CategoryName || "Tarot & Psychic",
               rating: parseFloat(r.Rating || 5.0),
-              reviewsCount: parseInt(r.TotalReviews || r.ReviewsCount || 154),
-              pricePerMinute: parseFloat(r.CallRatePerMinute || r.PricePerMinute || 3.99),
-              status: r.IsOnline ? "Online" : (r.Status || "Online"),
+              reviewsCount: parseInt(r.TotalReviews || r.ReviewsCount || 0),
+              pricePerMinute: parseFloat(r.CallRatePerMinute || r.PricePerMinute || 0),
+              status: r.IsOnline ? "Online" : (r.Status || "Offline"),
               profilePhoto: r.ProfilePhoto || null,
-              bio: r.AboutMyServices || r.BriefDescription || r.Bio || "Master clairvoyant and spiritual advisor."
+              bio: r.AboutMyServices || r.BriefDescription || r.Bio || ""
             });
           }
         }
-      } catch (e) { }
-      return res.status(200).json({
-        id: 101,
-        name: "Sanjeev Advisor",
-        categoryName: "Tarot & Psychic",
-        rating: 5.0,
-        reviewsCount: 154,
-        pricePerMinute: 3.99,
-        status: "Online",
-        bio: "Master clairvoyant and spiritual advisor."
-      });
+      } catch (e) {
+        console.error("Advisor detail error:", e);
+      }
+      return res.status(404).json({ message: "Advisor not found" });
     }
 
     // 5. Auth Login
@@ -388,49 +381,56 @@ module.exports = async (req, res) => {
 
     // 8. Billing Addresses
     if (pathname.includes('UserBillingAddress')) {
+      const uid = getUserId();
       try {
-        const addrRes = await pool.query(`SELECT * FROM "BillingAddresses" LIMIT 10`);
+        const addrRes = uid 
+          ? await pool.query(`SELECT * FROM "BillingAddresses" WHERE "UserId" = $1 OR "ApplicationUserId" = $1 LIMIT 10`, [uid])
+          : await pool.query(`SELECT * FROM "BillingAddresses" LIMIT 10`);
         if (addrRes.rows.length > 0) {
           const addresses = addrRes.rows.map(r => ({
-            id: r.Id || r.id,
-            billingId: r.Id || r.id,
-            fullName: r.FullName || r.Name || "Sanjeev User",
-            addressLine1: r.AddressLine1 || r.Address || "old street",
-            city: r.City || "Delhi",
-            state: r.State || "Delhi",
-            postalCode: r.PostalCode || r.Zip || "110001",
-            country: r.Country || "India",
+            id: r.BillingId || r.Id || r.id,
+            billingId: r.BillingId || r.Id || r.id,
+            fullName: `${r.FirstName || ''} ${r.LastName || ''}`.trim() || 'Billing Address',
+            addressLine1: r.Address1 || r.AddressLine1 || '',
+            addressLine2: r.Address2 || '',
+            city: r.City || '',
+            state: r.State || '',
+            postalCode: r.PostalCode || r.Zip || '',
+            country: r.Country || '',
             isDefault: r.IsDefault || false
           }));
           return res.status(200).json(addresses);
         }
-      } catch (e) { }
+      } catch (e) {
+        console.error("Billing addresses error:", e);
+      }
 
-      return res.status(200).json([
-        { id: 1, billingId: 1, fullName: "Sanjeev User", addressLine1: "old street", city: "Delhi", state: "Delhi", postalCode: "110001", country: "India", isDefault: true }
-      ]);
+      return res.status(200).json([]);
     }
 
     // 9. Notifications
     if (pathname.includes('notifications')) {
+      const uid = getUserId();
       try {
-        const notifRes = await pool.query(`SELECT * FROM "UserNotifications" LIMIT 10`);
+        const notifRes = uid
+          ? await pool.query(`SELECT * FROM "UserNotifications" WHERE "UserId" = $1 ORDER BY "CreatedON" DESC LIMIT 20`, [uid])
+          : await pool.query(`SELECT * FROM "UserNotifications" ORDER BY "CreatedON" DESC LIMIT 20`);
         if (notifRes.rows.length > 0) {
           const list = notifRes.rows.map((r, i) => ({
-            id: r.Id || i + 1,
-            title: r.Title || "Welcome to PsychicHeroes",
-            message: r.Message || "Your account has been set up successfully.",
-            createdAt: r.CreatedAt || new Date().toISOString(),
-            isRead: r.IsRead || false
+            id: r.NotificationId || r.Id || i + 1,
+            title: r.NotificationType || r.Title || "Notification",
+            message: r.NotificationDetail || r.Message || "",
+            senderName: r.SenderName || "",
+            createdAt: r.CreatedON || r.CreatedAt ? new Date(r.CreatedON || r.CreatedAt).toISOString() : new Date().toISOString(),
+            isRead: r.IsMarkRead ?? r.IsRead ?? false
           }));
           return res.status(200).json(list);
         }
-      } catch (e) { }
+      } catch (e) {
+        console.error("Notifications error:", e);
+      }
 
-      return res.status(200).json([
-        { id: 1, title: "Welcome to PsychicHeroes", message: "Connect with top-rated advisors for personal guidance.", createdAt: new Date().toISOString(), isRead: false },
-        { id: 2, title: "Special Offer", message: "Enjoy your first 3 minutes free on your next call or chat.", createdAt: new Date().toISOString(), isRead: false }
-      ]);
+      return res.status(200).json([]);
     }
 
     // 10. Real Wallet Transactions (Direct from TransactionHistories)
@@ -502,14 +502,14 @@ module.exports = async (req, res) => {
             return {
               id: `REQ-${r.TransId || i + 100}`,
               title: r.Description || "Spiritual Consultation Session",
-              advisorName: "Sanjeev Advisor",
+              advisorName: "Advisor",
               type: isChat ? "Live Chat" : (isVideo ? "Video Call" : "Voice Call"),
               typeKey: isChat ? "chat" : (isVideo ? "video" : "voice"),
               duration: "10 mins",
               date: r.CreatedAt ? new Date(r.CreatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Recent",
               cost: parseFloat(r.Debit || 0),
               rating: 5,
-              summary: "Intuitive consultation covering life clarity, spiritual paths, and relationship alignment."
+              summary: r.Description || "Intuitive consultation session."
             };
           });
           return res.status(200).json(list);
@@ -520,13 +520,13 @@ module.exports = async (req, res) => {
       return res.status(200).json([]);
     }
 
-    // 10. Live Session Polling & Synchronization Endpoints
+    // 12. Live Session Polling & Synchronization Endpoints
     if (pathname.includes('session-request')) {
       if (req.method === 'POST') {
         const body = req.body || {};
-        const clientName = body.clientName || 'Sanjeev User';
-        const advisorName = body.advisorName || 'Sanjeev Advisor';
-        const advisorId = body.advisorId || 'd3ed2ff2-1a19-43c2-931f-8ff040044973';
+        const clientName = body.clientName || 'User';
+        const advisorName = body.advisorName || 'Advisor';
+        const advisorId = body.advisorId || '';
         const initialMessages = body.messages || [
           {
             id: "msg_1",

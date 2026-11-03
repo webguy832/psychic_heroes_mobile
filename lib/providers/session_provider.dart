@@ -186,8 +186,8 @@ class SessionProvider extends ChangeNotifier {
 
           final status = session['status'];
           final reqId = session['id'] ?? 'req_1';
-          final clientName = session['clientName'] ?? 'Sanjeev User';
-          final advisorName = session['advisorName'] ?? 'Sanjeev Advisor';
+          final clientName = session['clientName'] ?? 'Client';
+          final advisorName = session['advisorName'] ?? 'Advisor';
           final typeStr = (session['type'] ?? 'chat').toString().toLowerCase();
           final type = typeStr.contains('video')
               ? SessionType.video
@@ -264,8 +264,8 @@ class SessionProvider extends ChangeNotifier {
 
             final status = session['status'];
             final reqId = session['id'] ?? 'req_1';
-            final clientName = session['clientName'] ?? 'Sanjeev User';
-            final advisorName = session['advisorName'] ?? 'Sanjeev Advisor';
+            final clientName = session['clientName'] ?? 'Client';
+            final advisorName = session['advisorName'] ?? 'Advisor';
             final typeStr = (session['type'] ?? 'chat').toString().toLowerCase();
             final type = typeStr.contains('video')
                 ? SessionType.video
@@ -426,12 +426,14 @@ class SessionProvider extends ChangeNotifier {
   void startDemoSession({
     required String advisorId,
     required String advisorName,
+    String clientId = "client",
+    String clientName = "Client",
     SessionType type = SessionType.chat,
     double ratePerMinute = 3.99,
   }) {
     initiateSessionRequest(
-      clientId: "client_1",
-      clientName: "Sanjeev User",
+      clientId: clientId,
+      clientName: clientName,
       advisorId: advisorId,
       advisorName: advisorName,
       type: type,
