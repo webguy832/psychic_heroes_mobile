@@ -14,8 +14,8 @@ class CategoryDto {
   factory CategoryDto.fromJson(Map<String, dynamic> json) {
     return CategoryDto(
       id: json['id']?.toString() ?? json['psychicCategoryId']?.toString() ?? '',
-      name: json['name'] ?? json['categoryName'] ?? 'Category',
-      icon: json['icon'] ?? json['iconUrl'] ?? json['image'],
+      name: json['title'] ?? json['name'] ?? json['categoryName'] ?? 'Category',
+      icon: json['imageUrl'] ?? json['icon'] ?? json['iconUrl'] ?? json['image'],
       description: json['description'],
     );
   }
