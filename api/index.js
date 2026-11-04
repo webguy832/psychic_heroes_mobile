@@ -72,7 +72,7 @@ module.exports = async (req, res) => {
     // 3. Home Advisors & Advisors List
     if (pathname.includes('GetHomeAdvisor') || pathname.endsWith('/advisors')) {
       try {
-        const dbRes = await pool.query(`SELECT * FROM "AdvisorProfiles" LIMIT 30`);
+        const dbRes = await pool.query(`SELECT * FROM "AdvisorProfiles" LIMIT 10`);
         if (dbRes.rows.length > 0) {
           const advisors = dbRes.rows.map((r, idx) => ({
             id: r.Id || r.AdvisorId || idx + 101,

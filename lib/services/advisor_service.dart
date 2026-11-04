@@ -6,7 +6,7 @@ class AdvisorService {
   Future<List<AdvisorDto>> getHomeAdvisors({String? categoryId, String? search}) async {
     final body = <String, dynamic>{
       'page': 1,
-      'pageSize': 20,
+      'pageSize': 10,
       'recordCount': 0,
       'sortColumn': 'displayName',
       'sortOrder': 'asc',

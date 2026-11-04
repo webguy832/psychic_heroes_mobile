@@ -75,6 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         break;
     }
+    if (list.length > 10) {
+      list = list.take(10).toList();
+    }
     return list;
   }
 
