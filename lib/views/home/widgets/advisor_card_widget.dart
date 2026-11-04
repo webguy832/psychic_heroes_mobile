@@ -6,11 +6,13 @@ import '../../advisors/advisor_detail_screen.dart';
 
 class AdvisorCardWidget extends StatelessWidget {
   final AdvisorDto advisor;
+  final bool isGrid;
   final VoidCallback? onTap;
 
   const AdvisorCardWidget({
     Key? key,
     required this.advisor,
+    this.isGrid = true,
     this.onTap,
   }) : super(key: key);
 
@@ -38,19 +40,347 @@ class AdvisorCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isGrid) {
+      return _buildGridCard(context);
+    }
+    return _buildListCard(context);
+  }
+
+  /// 2-Column Pocket Insight Card Architecture with Psychic Heroes Theme Colors (White + Royal Purple + Gold)
+  Widget _buildGridCard(BuildContext context) {
     final statusColor = _getStatusColor(advisor.status);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: AppColors.bgLightCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: const Color(0xFFEADBFF), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
+            color: const Color(0xFF2B0844).withOpacity(0.06),
+            blurRadius: 12,
             offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openDetail(context),
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Photo Area with Badges, Rating, and Video Overlay
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                    child: Container(
+                      height: 145,
+                      width: double.infinity,
+                      color: const Color(0xFFF3E8FF),
+                      child: (advisor.profilePhoto != null && advisor.profilePhoto!.isNotEmpty)
+                          ? Image.network(
+                              ApiEndpoints.resolveImageUrl(advisor.profilePhoto),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(),
+                            )
+                          : _buildAvatarFallback(),
+                    ),
+                  ),
+
+                  // Top-Left Badge: e.g. "Top Trusted" / "Staff Pick"
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.accentGold.withOpacity(0.6), width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.verified_rounded, size: 10, color: AppColors.accentGold),
+                          const SizedBox(width: 4),
+                          Text(
+                            advisor.badgeLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Top-Right Badges: e.g. 24h & Chat/Call/Diamond icons
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4C1D95),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            "24h",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.4),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.diamond_rounded, size: 11, color: AppColors.accentGold),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bottom-Left Overlay: ★ 4.98 Rating Pill
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
+                          const SizedBox(width: 3),
+                          Text(
+                            advisor.rating.toStringAsFixed(2),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Bottom-Right Overlay: Video Play Circle (▷)
+                  if (advisor.hasVideo)
+                    Positioned(
+                      bottom: 6,
+                      right: 8,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.black.withOpacity(0.6),
+                          border: Border.all(color: Colors.white70, width: 1.2),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+
+              // Content Area
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Advisor Name + Status Dot
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            advisor.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: statusColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: statusColor.withOpacity(0.5),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+
+                    // Specialty Tagline
+                    Text(
+                      advisor.tagline ?? advisor.categoryName ?? "Psychic & Spiritual Advisor",
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondaryLight,
+                        height: 1.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // 2-Column Mini Stats (Readings | Response In or Price)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "${advisor.readingsCount}",
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimaryLight,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Text(
+                                "Readings",
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 22,
+                          color: const Color(0xFFE5DEEF),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "≈ ${advisor.responseHours}hr",
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimaryLight,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Text(
+                                "Response In",
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Connect Now CTA Button (Mystic Gold & Purple Theme)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 34,
+                      child: ElevatedButton(
+                        onPressed: () => _openDetail(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accentGold,
+                          foregroundColor: const Color(0xFF2B0844),
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.chat_bubble_rounded, size: 13, color: Color(0xFF2B0844)),
+                            const SizedBox(width: 5),
+                            Text(
+                              advisor.pricePerMinute > 0 ? "Connect Now" : "Chat Free",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2B0844),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// List View Card for Horizontal List Mode
+  Widget _buildListCard(BuildContext context) {
+    final statusColor = _getStatusColor(advisor.status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEADBFF)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2B0844).withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -58,44 +388,26 @@ class AdvisorCardWidget extends StatelessWidget {
         onTap: () => _openDetail(context),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(14.0),
+          padding: const EdgeInsets.all(12.0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Advisor Avatar + Status Badge + Free Minutes Ribbon
+              // Avatar
               Stack(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
-                      width: 72,
-                      height: 82,
-                      color: AppColors.primary.withOpacity(0.1),
+                      width: 76,
+                      height: 86,
+                      color: const Color(0xFFF3E8FF),
                       child: (advisor.profilePhoto != null && advisor.profilePhoto!.isNotEmpty)
                           ? Image.network(
                               ApiEndpoints.resolveImageUrl(advisor.profilePhoto),
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Center(
-                                child: Text(
-                                  advisor.name.isNotEmpty ? advisor.name[0].toUpperCase() : 'A',
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(),
                             )
-                          : Center(
-                              child: Text(
-                                advisor.name.isNotEmpty ? advisor.name[0].toUpperCase() : 'A',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
+                          : _buildAvatarFallback(),
                     ),
                   ),
                   Positioned(
@@ -111,11 +423,32 @@ class AdvisorCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Positioned(
+                    bottom: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.star_rounded, size: 10, color: Color(0xFFFBBF24)),
+                          const SizedBox(width: 2),
+                          Text(
+                            advisor.rating.toStringAsFixed(1),
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
 
-              // Info & Details
+              // Details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,17 +462,17 @@ class AdvisorCardWidget extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimaryLight,
+                              color: AppColors.primary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: statusColor.withOpacity(0.4)),
                           ),
                           child: Text(
@@ -153,93 +486,46 @@ class AdvisorCardWidget extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (advisor.categoryName != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        advisor.categoryName!,
-                        style: const TextStyle(
-                          color: AppColors.accentPurple,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      advisor.tagline ?? advisor.categoryName ?? "Psychic Specialist",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
                       ),
-                    ],
-                    const SizedBox(height: 6),
-
-                    // Rating & Reviews
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, color: AppColors.accentGoldDark, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          advisor.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: AppColors.textPrimaryLight,
-                          ),
-                        ),
-                        Text(
-                          " (${advisor.reviewsCount} reviews)",
-                          style: const TextStyle(color: AppColors.textSecondaryLight, fontSize: 12),
-                        ),
-                      ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 8),
 
-                    const SizedBox(height: 10),
-
-                    // Pricing & Web-style Green Action Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "\$${advisor.pricePerMinute.toStringAsFixed(2)}/min",
+                          "${advisor.readingsCount} readings • \$${advisor.pricePerMinute.toStringAsFixed(2)}/min",
                           style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimaryLight,
                           ),
                         ),
-                        Row(
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: () => _openDetail(context),
-                              icon: const Icon(Icons.chat_bubble, size: 14, color: Colors.white),
-                              label: const Text(
-                                "Chat",
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.ctaGreen,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                elevation: 0,
-                              ),
+                        ElevatedButton(
+                          onPressed: () => _openDetail(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentGold,
+                            foregroundColor: const Color(0xFF2B0844),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            const SizedBox(width: 6),
-                            ElevatedButton.icon(
-                              onPressed: () => _openDetail(context),
-                              icon: const Icon(Icons.phone, size: 14, color: Colors.white),
-                              label: const Text(
-                                "Call",
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.ctaGreen,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
-                          ],
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            "Connect Now",
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),
@@ -252,5 +538,19 @@ class AdvisorCardWidget extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildAvatarFallback() {
+    return Center(
+      child: Text(
+        advisor.name.isNotEmpty ? advisor.name[0].toUpperCase() : 'A',
+        style: const TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
 }
+
 
