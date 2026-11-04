@@ -94,72 +94,101 @@ class AdvisorCardWidget extends StatelessWidget {
                     ),
                   ),
 
-                  // Top-Left Badge: e.g. "Top Trusted" / "Staff Pick"
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.accentGold.withOpacity(0.6), width: 0.8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.verified_rounded, size: 10, color: AppColors.accentGold),
-                          const SizedBox(width: 4),
-                          Text(
-                            advisor.badgeLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.2,
+                  // Top-Left Badge: Only show if real badge exists (Featured, New, Top Rated)
+                  if (advisor.badgeLabel != null && advisor.badgeLabel!.isNotEmpty)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.88),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.accentGold.withOpacity(0.6), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              advisor.featured ? Icons.star_rounded : Icons.verified_rounded,
+                              size: 11,
+                              color: AppColors.accentGold,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              advisor.badgeLabel!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
 
-                  // Top-Right Badges: e.g. 24h & Chat/Call/Diamond icons
+                  // Top-Right Badges: Real Comm Styles & Offers (Chat / Call / Video / Free Mins)
                   Positioned(
                     top: 8,
                     right: 8,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4C1D95),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            "24h",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                        if (advisor.doFreeMins)
+                          Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF16A34A),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              "FREE MINS",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.4),
-                            shape: BoxShape.circle,
+                        if (advisor.hasChat)
+                          Container(
+                            margin: const EdgeInsets.only(left: 3),
+                            padding: const EdgeInsets.all(3.5),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.chat_bubble_outline_rounded, size: 10, color: Colors.white),
                           ),
-                          child: const Icon(Icons.diamond_rounded, size: 11, color: AppColors.accentGold),
-                        ),
+                        if (advisor.hasCall)
+                          Container(
+                            margin: const EdgeInsets.only(left: 3),
+                            padding: const EdgeInsets.all(3.5),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.phone_outlined, size: 10, color: Colors.white),
+                          ),
+                        if (advisor.hasVideo)
+                          Container(
+                            margin: const EdgeInsets.only(left: 3),
+                            padding: const EdgeInsets.all(3.5),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.videocam_outlined, size: 10, color: Colors.white),
+                          ),
                       ],
                     ),
                   ),
 
-                  // Bottom-Left Overlay: ★ 4.98 Rating Pill
+                  // Bottom-Left Overlay: ★ Rating or "New"
                   Positioned(
                     bottom: 8,
                     left: 8,
@@ -175,7 +204,7 @@ class AdvisorCardWidget extends StatelessWidget {
                           const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
                           const SizedBox(width: 3),
                           Text(
-                            advisor.rating.toStringAsFixed(2),
+                            advisor.rating > 0 ? advisor.rating.toStringAsFixed(1) : "New",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
@@ -187,8 +216,8 @@ class AdvisorCardWidget extends StatelessWidget {
                     ),
                   ),
 
-                  // Bottom-Right Overlay: Video Play Circle (▷)
-                  if (advisor.hasVideo)
+                  // Bottom-Right Overlay: Video Play Circle (▷) - Only if advisor has actual videoUrl
+                  if (advisor.videoUrl != null && advisor.videoUrl!.isNotEmpty)
                     Positioned(
                       bottom: 6,
                       right: 8,
@@ -264,15 +293,16 @@ class AdvisorCardWidget extends StatelessWidget {
 
                     const SizedBox(height: 8),
 
-                    // 2-Column Mini Stats (Readings | Response In or Price)
+                    // 2-Column Real Stats (Reviews Count | Live Rate Per Minute)
                     Row(
                       children: [
+                        // Col 1: Real Total Reviews from DB
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "${advisor.readingsCount}",
+                                "${advisor.reviewsCount}",
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
@@ -281,9 +311,9 @@ class AdvisorCardWidget extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const Text(
-                                "Readings",
-                                style: TextStyle(
+                              Text(
+                                advisor.reviewsCount == 1 ? "Review" : "Reviews",
+                                style: const TextStyle(
                                   fontSize: 9.5,
                                   color: AppColors.textSecondaryLight,
                                 ),
@@ -297,22 +327,43 @@ class AdvisorCardWidget extends StatelessWidget {
                           color: const Color(0xFFE5DEEF),
                         ),
                         const SizedBox(width: 8),
+                        // Col 2: Real Live Rate per minute (with strikethrough if offeredFee discount)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                "≈ ${advisor.responseHours}hr",
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimaryLight,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (advisor.offeredFee > 0 && advisor.fee > advisor.offeredFee) ...[
+                                    Text(
+                                      "\$${advisor.fee.toStringAsFixed(0)}",
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                        decoration: TextDecoration.lineThrough,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  Text(
+                                    advisor.pricePerMinute > 0
+                                        ? "\$${advisor.pricePerMinute.toStringAsFixed(2)}"
+                                        : "Free",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: (advisor.offeredFee > 0 && advisor.fee > advisor.offeredFee)
+                                          ? const Color(0xFF16A34A)
+                                          : AppColors.textPrimaryLight,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
                               const Text(
-                                "Response In",
+                                "/ minute",
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   color: AppColors.textSecondaryLight,
@@ -439,7 +490,7 @@ class AdvisorCardWidget extends StatelessWidget {
                           const Icon(Icons.star_rounded, size: 10, color: Color(0xFFFBBF24)),
                           const SizedBox(width: 2),
                           Text(
-                            advisor.rating.toStringAsFixed(1),
+                            advisor.rating > 0 ? advisor.rating.toStringAsFixed(1) : "New",
                             style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -504,7 +555,7 @@ class AdvisorCardWidget extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "${advisor.readingsCount} readings • \$${advisor.pricePerMinute.toStringAsFixed(2)}/min",
+                          "${advisor.reviewsCount} ${advisor.reviewsCount == 1 ? 'review' : 'reviews'} • \$${advisor.pricePerMinute.toStringAsFixed(2)}/min",
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

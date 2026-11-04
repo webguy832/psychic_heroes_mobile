@@ -55,8 +55,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'rating':
         list.sort((a, b) => b.rating.compareTo(a.rating));
         break;
+      case 'reviews':
       case 'readings':
-        list.sort((a, b) => b.readingsCount.compareTo(a.readingsCount));
+        list.sort((a, b) => b.reviewsCount.compareTo(a.reviewsCount));
         break;
       case 'price_asc':
         list.sort((a, b) => a.pricePerMinute.compareTo(b.pricePerMinute));
@@ -112,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Divider(),
                 _buildSortOption(ctx, "Featured / Recommended", 'featured', Icons.star_outline_rounded),
                 _buildSortOption(ctx, "Highest Rating (★ 5.0)", 'rating', Icons.star_rounded),
-                _buildSortOption(ctx, "Most Completed Readings", 'readings', Icons.auto_stories_rounded),
+                _buildSortOption(ctx, "Most Client Reviews", 'reviews', Icons.rate_review_outlined),
                 _buildSortOption(ctx, "Price: Low to High", 'price_asc', Icons.arrow_upward_rounded),
                 _buildSortOption(ctx, "Price: High to Low", 'price_desc', Icons.arrow_downward_rounded),
                 _buildSortOption(ctx, "Online First", 'online', Icons.circle_rounded),

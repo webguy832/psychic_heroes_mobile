@@ -5,13 +5,17 @@ class AdvisorDto {
   final String status; // Online, Busy, Offline
   final double rating;
   final int reviewsCount;
-  final int readingsCount;
+  final double fee;
+  final double offeredFee;
   final double pricePerMinute;
   final String? categoryName;
   final String? tagline;
   final String? bio;
-  final String badgeLabel;
-  final double responseHours;
+  final String? badgeLabel;
+  final bool featured;
+  final bool isFirstTime;
+  final bool doFreeMins;
+  final String? videoUrl;
   final bool hasVideo;
   final bool hasCall;
   final bool hasChat;
@@ -23,43 +27,59 @@ class AdvisorDto {
     required this.status,
     required this.rating,
     required this.reviewsCount,
-    required this.readingsCount,
+    required this.fee,
+    required this.offeredFee,
     required this.pricePerMinute,
     this.categoryName,
     this.tagline,
     this.bio,
-    this.badgeLabel = 'Top Trusted',
-    this.responseHours = 2.4,
-    this.hasVideo = true,
-    this.hasCall = true,
-    this.hasChat = true,
+    this.badgeLabel,
+    this.featured = false,
+    this.isFirstTime = false,
+    this.doFreeMins = false,
+    this.videoUrl,
+    this.hasVideo = false,
+    this.hasCall = false,
+    this.hasChat = false,
   });
 
   factory AdvisorDto.fromJson(Map<String, dynamic> json) {
-    final rawReviews = json['reviewsCount'] ?? json['totalReviews'] ?? 0;
+    final rawReviews = json['reviewsCount'] ?? json['totalReviews'] ?? json['initReviewCount'] ?? 0;
     final int reviews = (rawReviews is num) ? rawReviews.toInt() : int.tryParse(rawReviews.toString()) ?? 0;
     
-    final rawRating = json['rating'] ?? json['averageRating'];
-    double ratingVal = (rawRating is num && rawRating > 0) ? rawRating.toDouble() : 4.95;
-    if (ratingVal < 4.0 && ratingVal > 0) ratingVal = 4.85;
+    final rawRating = json['rating'] ?? json['averageRating'] ?? 0;
+    final double ratingVal = (rawRating is num) ? rawRating.toDouble() : double.tryParse(rawRating.toString()) ?? 0.0;
 
     final idStr = json['id']?.toString() ?? json['advisorId']?.toString() ?? '';
-    final int hashSeed = idStr.hashCode.abs();
-    final int calculatedReadings = reviews > 0 
-        ? (reviews * 18 + (hashSeed % 500) + 120) 
-        : ((hashSeed % 15000) + 2100);
 
-    final double respTime = ((hashSeed % 40) / 10.0 + 1.2);
-    final badges = ['Top Trusted', 'Staff Pick', 'Top Accuracy', 'Top Rated'];
-    final badge = badges[hashSeed % badges.length];
+    final rawFee = json['callRatePerMinute'] ?? json['fee'] ?? json['pricePerMinute'] ?? 0;
+    final double feeVal = (rawFee is num) ? rawFee.toDouble() : double.tryParse(rawFee.toString()) ?? 0.0;
+
+    final rawOfferedFee = json['offeredFee'] ?? 0;
+    final double offeredFeeVal = (rawOfferedFee is num) ? rawOfferedFee.toDouble() : double.tryParse(rawOfferedFee.toString()) ?? 0.0;
+
+    final double effectivePrice = (offeredFeeVal > 0) ? offeredFeeVal : feeVal;
+
+    final bool isFeatured = json['featured'] == true || (json['ranking'] != null && json['ranking'] > 0);
+    final bool isFirstTime = json['isFirstTime'] == 1 || json['isFirstTime'] == true;
+
+    String? badge;
+    if (isFeatured) {
+      badge = 'Featured';
+    } else if (isFirstTime) {
+      badge = 'New';
+    } else if (reviews >= 10 && ratingVal >= 4.5) {
+      badge = 'Top Rated';
+    }
 
     final commStyles = json['commStyles']?.toString() ?? '';
-    final hasVideo = json['videoUrl'] != null || commStyles.contains('3') || true;
-    final hasCall = commStyles.contains('2') || json['callRatePerMinute'] != null || true;
-    final hasChat = commStyles.contains('1') || json['acceptTextReading'] == true || true;
+    final video = json['videoUrl']?.toString();
+    final hasVideo = (video != null && video.isNotEmpty) || commStyles.contains('3') || commStyles.contains('2');
+    final hasCall = commStyles.contains('2') || commStyles.contains('3') || json['phone1'] != null;
+    final hasChat = commStyles.contains('1') || json['acceptTextReading'] == true;
 
     final catName = json['categoryName'] ?? json['category'] ?? json['primaryCategory'];
-    final title = json['advisorTitle'] ?? json['specialities'] ?? json['briefDescription'] ?? catName ?? 'Relationship & Life Path';
+    final title = json['advisorTitle'] ?? json['specialities'] ?? json['specialization'] ?? json['briefDescription'] ?? catName;
 
     return AdvisorDto(
       id: idStr,
@@ -70,17 +90,22 @@ class AdvisorDto {
           : (json['isBusy'] == true ? 'Busy' : (json['status']?.toString() == '1' ? 'Online' : 'Offline')),
       rating: ratingVal,
       reviewsCount: reviews,
-      readingsCount: calculatedReadings,
-      pricePerMinute: (json['callRatePerMinute'] ?? json['fee'] ?? json['pricePerMinute'] ?? json['feePerMin'] ?? 1.99).toDouble(),
+      fee: feeVal,
+      offeredFee: offeredFeeVal,
+      pricePerMinute: effectivePrice,
       categoryName: catName,
-      tagline: title.toString().replaceAll('\n', ' ').trim(),
+      tagline: title != null ? title.toString().replaceAll('\n', ' ').trim() : null,
       bio: json['aboutMyServices'] ?? json['briefDescription'] ?? json['bio'] ?? json['aboutMe'],
       badgeLabel: badge,
-      responseHours: double.parse(respTime.toStringAsFixed(1)),
+      featured: isFeatured,
+      isFirstTime: isFirstTime,
+      doFreeMins: json['doFreeMins'] == true || json['freeMins'] != null,
+      videoUrl: video,
       hasVideo: hasVideo,
       hasCall: hasCall,
       hasChat: hasChat,
     );
   }
 }
+
 

@@ -72,18 +72,34 @@ module.exports = async (req, res) => {
     // 3. Home Advisors & Advisors List
     if (pathname.includes('GetHomeAdvisor') || pathname.endsWith('/advisors')) {
       try {
-        const dbRes = await pool.query(`SELECT * FROM "AdvisorProfiles" LIMIT 20`);
+        const dbRes = await pool.query(`SELECT * FROM "AdvisorProfiles" LIMIT 30`);
         if (dbRes.rows.length > 0) {
           const advisors = dbRes.rows.map((r, idx) => ({
-            id: r.Id || idx + 101,
+            id: r.Id || r.AdvisorId || idx + 101,
+            displayName: r.DisplayName || r.Name || r.ScreenName || "Advisor",
             name: r.DisplayName || r.Name || r.ScreenName || "Advisor",
-            categoryName: r.Category || r.CategoryName || "Tarot & Psychic",
-            rating: parseFloat(r.Rating || 5.0),
-            reviewsCount: parseInt(r.TotalReviews || r.ReviewsCount || 0),
-            pricePerMinute: parseFloat(r.CallRatePerMinute || r.PricePerMinute || 0),
-            status: r.IsOnline ? "Online" : (r.Status || "Offline"),
+            categoryName: r.Category || r.CategoryName || null,
+            rating: r.Rating != null ? parseFloat(r.Rating) : 0.0,
+            reviewsCount: parseInt(r.TotalReviews || r.InitReviewCount || 0),
+            totalReviews: parseInt(r.TotalReviews || r.InitReviewCount || 0),
+            fee: parseFloat(r.Fee || r.CallRatePerMinute || 0),
+            offeredFee: parseFloat(r.HourFee && parseFloat(r.HourFee) > 0 ? r.HourFee : 0),
+            callRatePerMinute: parseFloat(r.CallRatePerMinute || r.Fee || 0),
+            videoRatePerMinute: parseFloat(r.VideoRatePerMinute || 0),
+            pricePerMinute: parseFloat(r.CallRatePerMinute || r.Fee || 0),
+            status: r.IsOnline ? "Online" : (r.IsBusy ? "Busy" : "Offline"),
+            isOnline: Boolean(r.IsOnline),
+            isBusy: Boolean(r.IsBusy),
+            featured: Boolean(r.Featured || (r.Ranking && r.Ranking > 0)),
+            doFreeMins: Boolean(r.DoFreeMins),
+            videoUrl: r.VideoUrl || null,
+            commStyles: r.CommStyles || "",
+            acceptTextReading: Boolean(r.AcceptTextReading),
+            specialities: r.Specialities || null,
+            advisorTitle: r.AdvisorTitle || (r.BriefDescription ? r.BriefDescription.replace(/<[^>]*>/g, '').trim() : null),
             profilePhoto: r.ProfilePhoto || null,
-            bio: r.AboutMyServices || r.BriefDescription || r.Bio || ""
+            photo: r.ProfilePhoto || null,
+            bio: (r.AboutMyServices || r.BriefDescription || "").replace(/<[^>]*>/g, '').trim()
           }));
           return res.status(200).json(advisors);
         }
@@ -106,14 +122,30 @@ module.exports = async (req, res) => {
             const r = dbRes.rows[0];
             return res.status(200).json({
               id: r.Id,
+              displayName: r.DisplayName || r.Name || r.ScreenName || "Advisor",
               name: r.DisplayName || r.Name || r.ScreenName || "Advisor",
-              categoryName: r.Category || r.CategoryName || "Tarot & Psychic",
-              rating: parseFloat(r.Rating || 5.0),
-              reviewsCount: parseInt(r.TotalReviews || r.ReviewsCount || 0),
-              pricePerMinute: parseFloat(r.CallRatePerMinute || r.PricePerMinute || 0),
-              status: r.IsOnline ? "Online" : (r.Status || "Offline"),
+              categoryName: r.Category || r.CategoryName || null,
+              rating: r.Rating != null ? parseFloat(r.Rating) : 0.0,
+              reviewsCount: parseInt(r.TotalReviews || r.InitReviewCount || 0),
+              totalReviews: parseInt(r.TotalReviews || r.InitReviewCount || 0),
+              fee: parseFloat(r.Fee || r.CallRatePerMinute || 0),
+              offeredFee: parseFloat(r.HourFee && parseFloat(r.HourFee) > 0 ? r.HourFee : 0),
+              callRatePerMinute: parseFloat(r.CallRatePerMinute || r.Fee || 0),
+              videoRatePerMinute: parseFloat(r.VideoRatePerMinute || 0),
+              pricePerMinute: parseFloat(r.CallRatePerMinute || r.Fee || 0),
+              status: r.IsOnline ? "Online" : (r.IsBusy ? "Busy" : "Offline"),
+              isOnline: Boolean(r.IsOnline),
+              isBusy: Boolean(r.IsBusy),
+              featured: Boolean(r.Featured || (r.Ranking && r.Ranking > 0)),
+              doFreeMins: Boolean(r.DoFreeMins),
+              videoUrl: r.VideoUrl || null,
+              commStyles: r.CommStyles || "",
+              acceptTextReading: Boolean(r.AcceptTextReading),
+              specialities: r.Specialities || null,
+              advisorTitle: r.AdvisorTitle || (r.BriefDescription ? r.BriefDescription.replace(/<[^>]*>/g, '').trim() : null),
               profilePhoto: r.ProfilePhoto || null,
-              bio: r.AboutMyServices || r.BriefDescription || r.Bio || ""
+              photo: r.ProfilePhoto || null,
+              bio: (r.AboutMyServices || r.BriefDescription || "").replace(/<[^>]*>/g, '').trim()
             });
           }
         }

@@ -148,7 +148,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
             const SizedBox(height: 12),
             _buildBillingRow("Rate per Minute", "\$${widget.advisor.pricePerMinute.toStringAsFixed(2)} / min"),
             _buildBillingRow("Introductory Offer", "First 3 Minutes FREE"),
-            _buildBillingRow("Your Wallet Balance", "\$${(user?.walletBalance ?? 25.0).toStringAsFixed(2)}"),
+            _buildBillingRow("Your Wallet Balance", "\$${(user?.walletBalance ?? 0.0).toStringAsFixed(2)}"),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
