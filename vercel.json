@@ -2,8 +2,19 @@
   "version": 2,
   "framework": null,
   "installCommand": "npm install && (if [ -d flutter ]; then cd flutter && git pull && cd .. ; else git clone --depth 1 -b stable https://github.com/flutter/flutter.git; fi)",
-  "buildCommand": "export PATH=\"$PATH:$(pwd)/flutter/bin\" && flutter config --no-analytics && flutter build web --release",
+  "buildCommand": "export PATH=\"$PATH:$(pwd)/flutter/bin\" && flutter config --no-analytics && flutter build web --release --pwa-strategy=none",
   "outputDirectory": "build/web",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://psychicheroes.online/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

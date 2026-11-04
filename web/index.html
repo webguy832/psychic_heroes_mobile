@@ -3,6 +3,9 @@
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="PsychicHeroes Mobile Application">
 
@@ -20,14 +23,32 @@
 
   <style>
     body {
-      background-color: #130F26;
+      background-color: #F9F7FF;
       margin: 0;
       padding: 0;
       overflow: hidden;
     }
   </style>
+
+  <script>
+    // Force unregister all stale Flutter service workers and purge caches
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (var name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+  </script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter_bootstrap.js?v=20261104_1800" async></script>
 </body>
 </html>
