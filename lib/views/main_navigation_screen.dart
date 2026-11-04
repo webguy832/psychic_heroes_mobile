@@ -164,43 +164,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: IndexedStack(
-            index: safeIndex,
-            children: screens,
-          ),
-        ),
+      body: IndexedStack(
+        index: safeIndex,
+        children: screens,
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: BottomNavigationBar(
-              currentIndex: safeIndex,
-              onTap: (idx) => nav.setTab(idx),
-              items: navItems,
-              backgroundColor: Colors.white,
-              selectedItemColor: AppColors.accentGoldDark,
-              unselectedItemColor: const Color(0xFF9CA3AF),
-              selectedFontSize: 11,
-              unselectedFontSize: 11,
-              type: BottomNavigationBarType.fixed,
-              elevation: 0,
-            ),
-          ),
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: safeIndex,
+        onTap: (idx) => nav.setTab(idx),
+        items: navItems,
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.accentGoldDark,
+        unselectedItemColor: const Color(0xFF9CA3AF),
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        type: BottomNavigationBarType.fixed,
+        elevation: 10,
       ),
     );
   }

@@ -274,16 +274,13 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: () async {
           await home.initHomeData();
         },
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: AppStyles.paddingPage,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: AppStyles.paddingPage,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -637,9 +634,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    ),
-  ),
-);
+    );
   }
 
   /// Builds concentric circle section header matching Pocket Insight screenshot (◎ Title 💎)
@@ -682,21 +677,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Builds advisors in either 2-Column Grid or List view with zero empty space
+  /// Builds advisors in responsive Grid or List view with zero empty space
   Widget _buildAdvisorsCollection(List<AdvisorDto> advisors) {
     if (_isGridMode) {
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: advisors.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisExtent: 295,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 14,
-        ),
-        itemBuilder: (ctx, idx) {
-          return AdvisorCardWidget(advisor: advisors[idx], isGrid: true);
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          int crossAxisCount = 2;
+          if (width > 1100) {
+            crossAxisCount = 4;
+          } else if (width > 700) {
+            crossAxisCount = 3;
+          } else {
+            crossAxisCount = 2;
+          }
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: advisors.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisExtent: 290,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 14,
+            ),
+            itemBuilder: (ctx, idx) {
+              return AdvisorCardWidget(advisor: advisors[idx], isGrid: true);
+            },
+          );
         },
       );
     }
