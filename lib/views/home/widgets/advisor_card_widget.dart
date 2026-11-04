@@ -80,13 +80,14 @@ class AdvisorCardWidget extends StatelessWidget {
                       topRight: Radius.circular(15),
                     ),
                     child: Container(
-                      height: 145,
+                      height: 140,
                       width: double.infinity,
                       color: const Color(0xFFF3E8FF),
                       child: (advisor.profilePhoto != null && advisor.profilePhoto!.isNotEmpty)
                           ? Image.network(
                               ApiEndpoints.resolveImageUrl(advisor.profilePhoto),
                               fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
                               errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(),
                             )
                           : _buildAvatarFallback(),
@@ -212,6 +213,7 @@ class AdvisorCardWidget extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Advisor Name + Status Dot
                     Row(

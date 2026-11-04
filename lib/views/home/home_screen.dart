@@ -274,13 +274,16 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: () async {
           await home.initHomeData();
         },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: AppStyles.paddingPage,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: AppStyles.paddingPage,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -634,7 +637,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   /// Builds concentric circle section header matching Pocket Insight screenshot (◎ Title 💎)
@@ -677,7 +682,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Builds advisors in either 2-Column Grid or List view
+  /// Builds advisors in either 2-Column Grid or List view with zero empty space
   Widget _buildAdvisorsCollection(List<AdvisorDto> advisors) {
     if (_isGridMode) {
       return GridView.builder(
@@ -686,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: advisors.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.58,
+          mainAxisExtent: 295,
           crossAxisSpacing: 12,
           mainAxisSpacing: 14,
         ),
