@@ -19,6 +19,23 @@ class ApiEndpoints {
   static const String psychicCategories = "api/Web/GetPsychicCategories";
   static const String homeAdvisors = "api/Web/GetHomeAdvisor";
   static const String advisorDetail = "api/advisor";
+  static const String advisorReviews = "api/Web/GetAdvisorReviews";
+  static const String userFreeMinutes = "api/web/GetUserFreeMinutes";
+  static const String checkSessionEligibility = "api/user/checkSessionEligibilty";
+
+  // Chat & Communication Endpoints (Exact matching web_angular_2025 & .NET 8 backend)
+  static const String startChat = "api/Chat/StartChat";
+  static const String acceptChat = "api/Chat/AcceptChat";
+  static const String cancelChat = "api/Chat/CancelChat";
+  static const String holdChat = "api/Chat/hold";
+  static const String resumeChat = "api/Chat/resume-chat";
+  static const String endChatSession = "api/Chat/end-session";
+  static const String getChatHistory = "api/Chat/NewSessionChatHistory";
+  static const String addChatHistory = "api/Chat/AddChatHistory";
+  static const String getChatRequests = "api/Chat/GetChatRequests";
+  static const String paidSessionConfirmation = "api/PaidSessionConfirmation";
+  static const String sessionSummary = "api/VoiceCall/summary";
+  static const String sessionDetails = "api/Chat/SessionDetails";
 
   // User Endpoints
   static const String userProfile = "api/User/GetUserProfile";

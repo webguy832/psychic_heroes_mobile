@@ -26,7 +26,12 @@ class ApiClient {
         ? (ApiEndpoints.baseUrl.isNotEmpty ? ApiEndpoints.baseUrl : "https://psychicheroes.online/")
         : '${ApiEndpoints.baseUrl}/';
     final fullPath = '$base$cleanPath';
-    return Uri.parse(fullPath).replace(queryParameters: queryParameters);
+    final parsed = Uri.parse(fullPath);
+    if (queryParameters != null && queryParameters.isNotEmpty) {
+      final merged = Map<String, String>.from(parsed.queryParameters)..addAll(queryParameters);
+      return parsed.replace(queryParameters: merged);
+    }
+    return parsed;
   }
 
   static Future<dynamic> get(String endpoint, {bool requiresAuth = true, Map<String, String>? queryParams}) async {
@@ -41,9 +46,9 @@ class ApiClient {
     }
   }
 
-  static Future<dynamic> post(String endpoint, {dynamic body, bool requiresAuth = true}) async {
+  static Future<dynamic> post(String endpoint, {dynamic body, bool requiresAuth = true, Map<String, String>? queryParams}) async {
     try {
-      final uri = _buildUri(endpoint);
+      final uri = _buildUri(endpoint, queryParams);
       final headers = await _getHeaders(requiresAuth: requiresAuth);
       final response = await http.post(
         uri,

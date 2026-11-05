@@ -5,6 +5,7 @@ import '../../providers/session_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import 'session_after_summary_screen.dart';
+import '../menu_pages/add_funds_screen.dart';
 
 class LiveSessionScreen extends StatefulWidget {
   final bool isAdvisorView;
@@ -206,6 +207,125 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
             _buildVideoCallViewport(sessionProv, titleName)
           else if (sessionProv.sessionType == SessionType.call)
             _buildVoiceCallHeader(sessionProv, titleName),
+
+          // Active Free Minutes Notice Banner
+          if (sessionProv.freeLeftSeconds > 0)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFF1E3A2B),
+              child: Row(
+                children: [
+                  const Icon(Icons.stars_rounded, color: AppColors.accentGold, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Free Promotional Chat: ${(sessionProv.freeLeftSeconds ~/ 60) + 1}m remaining free",
+                      style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Free Minutes Finished Transition Notice
+          if (sessionProv.showFreeFinishedNotice)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFF3B2E1E),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      "Free minutes finished. Session continuing from main wallet.",
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => sessionProv.dismissFreeFinishedNotice(),
+                    child: const Text("DISMISS", style: TextStyle(color: AppColors.accentGold, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+
+          // Low Balance Warning Banner (<= 3 mins left)
+          if (sessionProv.isLowBalanceWarning && !widget.isAdvisorView)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFF4A1E1E),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      "Low Balance: Less than 3 minutes remaining.",
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.ctaGreen,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AddFundsScreen()),
+                      );
+                    },
+                    child: const Text("ADD FUNDS", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+
+          // On-Hold Notice Banner / Action
+          if (sessionProv.sessionState == SessionState.hold)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: const Color(0xFF3B1E1E),
+              child: Column(
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.pause_circle_filled_rounded, color: AppColors.errorRed, size: 22),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Session Paused: Wallet balance depleted.",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Session timer is paused. Add funds to immediately resume chatting with your advisor.",
+                    style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.ctaGreen),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AddFundsScreen()),
+                      );
+                      sessionProv.resumeHeldSession(sessionProv.userBalance > 0 ? sessionProv.userBalance : 10.0);
+                    },
+                    child: const Text("ADD FUNDS & RESUME", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
 
           // Chat Messages List
           Expanded(
@@ -618,15 +738,15 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
             child: const Text("End Session", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            onPressed: () {
+            onPressed: () async {
               final activeReq = sessionProv.activeRequest;
               final titleName = widget.isAdvisorView
                   ? (activeReq?.clientName ?? "Client")
                   : (activeReq?.advisorName ?? "Advisor");
               final timeStr = sessionProv.formattedTimer;
               final costVal = sessionProv.currentSessionCost;
-              sessionProv.endSession();
               Navigator.pop(ctx);
+              await sessionProv.endSession();
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(

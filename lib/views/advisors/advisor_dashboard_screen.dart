@@ -19,6 +19,18 @@ class AdvisorDashboardScreen extends StatefulWidget {
 class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   bool _isDialogShowing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = Provider.of<UserProvider>(context, listen: false).user;
+      final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+      if (user != null && user.id.isNotEmpty) {
+        sessionProv.startAdvisorPolling(user.id);
+      }
+    });
+  }
+
   void _checkAndShowIncomingRequestDialog(BuildContext context, SessionProvider sessionProv) {
     if (sessionProv.incomingRequests.isNotEmpty && !_isDialogShowing) {
       final req = sessionProv.incomingRequests.first;

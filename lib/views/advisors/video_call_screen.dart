@@ -557,11 +557,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
             child: const Text("End Video Call", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            onPressed: () {
+            onPressed: () async {
               final durationStr = sessionProv.formattedTimer;
               final costVal = sessionProv.currentSessionCost;
-              sessionProv.endSession();
               Navigator.pop(ctx);
+              await sessionProv.endSession();
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
