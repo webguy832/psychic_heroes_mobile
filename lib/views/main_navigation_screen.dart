@@ -22,75 +22,99 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  // Demo mode: when true, only Home and Profile menu tabs are shown
+  static const bool _demoOnly = true;
+
   @override
   Widget build(BuildContext context) {
     final nav = Provider.of<NavigationProvider>(context);
     final userProv = Provider.of<UserProvider>(context);
     final isAdvisor = userProv.isAdvisor;
 
-    // 5 Screens matching Pocket Insight Architecture: Insight, Service, Inbox, Prediction, Mine
-    final List<Widget> screens = isAdvisor
-        ? const [
-            AdvisorDashboardScreen(),
-            MyServicesScreen(),
-            AdvisorMessagesScreen(),
-            ReadingHistoryScreen(),
-            ProfileScreen(),
-          ]
-        : const [
-            HomeScreen(),
-            MyServicesScreen(),
-            AdvisorMessagesScreen(),
-            ReadingHistoryScreen(),
-            ProfileScreen(),
-          ];
+    final List<Widget> screens = _demoOnly
+        ? (isAdvisor
+            ? const [
+                AdvisorDashboardScreen(),
+                ProfileScreen(),
+              ]
+            : const [
+                HomeScreen(),
+                ProfileScreen(),
+              ])
+        : (isAdvisor
+            ? const [
+                AdvisorDashboardScreen(),
+                MyServicesScreen(),
+                AdvisorMessagesScreen(),
+                ReadingHistoryScreen(),
+                ProfileScreen(),
+              ]
+            : const [
+                HomeScreen(),
+                MyServicesScreen(),
+                AdvisorMessagesScreen(),
+                ReadingHistoryScreen(),
+                ProfileScreen(),
+              ]);
 
-    // 5 Tabs matching Pocket Insight Architecture: Insight, Service, Inbox, Prediction, Mine
-    final List<BottomNavigationBarItem> navItems = [
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.auto_awesome_outlined),
-        activeIcon: Icon(Icons.auto_awesome_rounded),
-        label: "Insight",
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.diamond_outlined),
-        activeIcon: Icon(Icons.diamond_rounded),
-        label: "Service",
-      ),
-      BottomNavigationBarItem(
-        icon: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Icon(Icons.chat_bubble_outline_rounded),
-            if (userProv.unreadNotificationsCount > 0)
-              Positioned(
-                top: -2,
-                right: -3,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.errorRed,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+    final List<BottomNavigationBarItem> navItems = _demoOnly
+        ? const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home_rounded),
+              label: "Home",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: "Profile",
+            ),
+          ]
+        : [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.auto_awesome_outlined),
+              activeIcon: Icon(Icons.auto_awesome_rounded),
+              label: "Insight",
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.diamond_outlined),
+              activeIcon: Icon(Icons.diamond_rounded),
+              label: "Service",
+            ),
+            BottomNavigationBarItem(
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded),
+                  if (userProv.unreadNotificationsCount > 0)
+                    Positioned(
+                      top: -2,
+                      right: -3,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.errorRed,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
-        activeIcon: const Icon(Icons.chat_bubble_rounded),
-        label: "Inbox",
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.style_outlined),
-        activeIcon: Icon(Icons.style_rounded),
-        label: "Prediction",
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.person_outline_rounded),
-        activeIcon: Icon(Icons.person_rounded),
-        label: "Mine",
-      ),
-    ];
+              activeIcon: const Icon(Icons.chat_bubble_rounded),
+              label: "Inbox",
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.style_outlined),
+              activeIcon: Icon(Icons.style_rounded),
+              label: "Prediction",
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: "Mine",
+            ),
+          ];
 
     final safeIndex = nav.currentIndex.clamp(0, screens.length - 1);
 

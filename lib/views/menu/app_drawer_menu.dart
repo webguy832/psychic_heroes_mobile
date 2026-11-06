@@ -29,6 +29,9 @@ class AppDrawerMenu extends StatefulWidget {
 }
 
 class _AppDrawerMenuState extends State<AppDrawerMenu> {
+  // Demo mode: when true, only Home and Profile menu links are shown
+  static const bool _demoOnly = true;
+
   bool _isServicesExpanded = false;
 
   final List<String> _servicesList = [
@@ -206,6 +209,27 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
   }
 
   List<Widget> _buildCustomerMenuItems(BuildContext context, NavigationProvider nav) {
+    if (_demoOnly) {
+      return [
+        _buildDrawerTile(
+          icon: Icons.home_rounded,
+          title: "Home",
+          onTap: () {
+            nav.setTab(0);
+            Navigator.pop(context);
+          },
+        ),
+        _buildDrawerTile(
+          icon: Icons.person_rounded,
+          title: "Profile",
+          onTap: () {
+            nav.setTab(1);
+            Navigator.pop(context);
+          },
+        ),
+      ];
+    }
+
     return [
       _buildDrawerTile(
         icon: Icons.home_rounded,
@@ -314,7 +338,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         icon: Icons.person_rounded,
         title: "Profile",
         onTap: () {
-          nav.setTab(3);
+          nav.setTab(4);
           Navigator.pop(context);
         },
       ),
@@ -338,6 +362,27 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
   }
 
   List<Widget> _buildAdvisorMenuItems(BuildContext context, NavigationProvider nav) {
+    if (_demoOnly) {
+      return [
+        _buildDrawerTile(
+          icon: Icons.home_rounded,
+          title: "Home",
+          onTap: () {
+            nav.setTab(0);
+            Navigator.pop(context);
+          },
+        ),
+        _buildDrawerTile(
+          icon: Icons.person_rounded,
+          title: "Profile",
+          onTap: () {
+            nav.setTab(1);
+            Navigator.pop(context);
+          },
+        ),
+      ];
+    }
+
     return [
       _buildDrawerTile(
         icon: Icons.dashboard_rounded,
@@ -375,7 +420,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         icon: Icons.person_rounded,
         title: "Profile",
         onTap: () {
-          nav.setTab(3);
+          nav.setTab(4);
           Navigator.pop(context);
         },
       ),
