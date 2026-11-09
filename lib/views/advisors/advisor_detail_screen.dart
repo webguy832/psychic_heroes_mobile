@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/advisor_model.dart';
+import '../../models/category_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/session_provider.dart';
@@ -79,7 +80,13 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
 
   Future<void> _loadAdvisorProfile(String advisorId, String? userId) async {
     try {
-      final updatedAdvisor = await _advisorService.getAdvisorById(advisorId, userId: userId);
+      var updatedAdvisor = await _advisorService.getAdvisorById(advisorId, userId: userId);
+      // Preserve existing valid category name or title from widget/previous state if updated profile has null
+      final prevCat = _advisor?.categoryName ?? widget.advisor?.categoryName;
+      if ((updatedAdvisor.categoryName == null || updatedAdvisor.categoryName!.isEmpty) &&
+          prevCat != null && prevCat.isNotEmpty && !isGuidOrIdString(prevCat)) {
+        updatedAdvisor = updatedAdvisor.copyWith(categoryName: prevCat);
+      }
       if (mounted) {
         setState(() {
           _advisor = updatedAdvisor;
@@ -426,7 +433,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
                       ),
                       Text(
-                        adv.categoryName ?? adv.advisorTitle ?? "Psychic Guide",
+                        adv.displayTitle,
                         style: const TextStyle(fontSize: 12, color: AppColors.accentGold),
                       ),
                     ],
@@ -850,7 +857,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                a.categoryName ?? a.advisorTitle ?? "Psychic Guide",
+                                a.displayTitle,
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accentPurple),
                               ),
                               const SizedBox(height: 8),

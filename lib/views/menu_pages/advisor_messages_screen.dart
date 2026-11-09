@@ -64,7 +64,7 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
         dynamicThreads.add({
           'id': adv.id,
           'name': adv.name,
-          'specialty': adv.categoryName ?? 'Spiritual Psychic Advisor',
+          'specialty': adv.displayTitle,
           'lastMessage': (adv.bio != null && adv.bio!.isNotEmpty) ? adv.bio! : 'Available for live chat and guidance session.',
           'time': adv.status.toLowerCase() == 'online' ? 'Online Now' : 'Offline',
           'unread': 0,

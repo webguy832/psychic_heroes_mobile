@@ -17,12 +17,16 @@ class HomeService {
 
   Future<List<CategoryDto>> getPsychicCategories() async {
     final response = await ApiClient.get(ApiEndpoints.psychicCategories, requiresAuth: false);
+    List<CategoryDto> results = [];
     if (response is Map && response.containsKey('parentPsychicCategory') && response['parentPsychicCategory'] is List) {
       final list = response['parentPsychicCategory'] as List;
-      return list.map((item) => CategoryDto.fromJson(item as Map<String, dynamic>)).toList();
+      results = list.map((item) => CategoryDto.fromJson(item as Map<String, dynamic>)).toList();
     } else if (response is List) {
-      return response.map((item) => CategoryDto.fromJson(item as Map<String, dynamic>)).toList();
+      results = response.map((item) => CategoryDto.fromJson(item as Map<String, dynamic>)).toList();
     }
-    return [];
+    if (results.isNotEmpty) {
+      CategoryDto.registerCategories(results);
+    }
+    return results;
   }
 }

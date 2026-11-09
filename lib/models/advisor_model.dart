@@ -1,3 +1,5 @@
+import 'category_model.dart';
+
 class AdvisorDto {
   final String id;
   final String? loginId;
@@ -93,14 +95,34 @@ class AdvisorDto {
     return parts.contains(style.toString());
   }
 
-  /// List of specialities parsed from comma-separated string
+  /// List of specialities parsed from comma-separated string (filtering out any raw GUID IDs)
   List<String> get specialitiesList {
     if (specialities == null || specialities!.trim().isEmpty) return [];
     return specialities!
         .split(',')
         .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
+        .where((s) => s.isNotEmpty && !isGuidOrIdString(s))
         .toList();
+  }
+
+  /// Returns a clean, human-readable display title or category (never a raw GUID/ID)
+  String get displayTitle {
+    if (advisorTitle != null && advisorTitle!.trim().isNotEmpty && !isGuidOrIdString(advisorTitle)) {
+      return advisorTitle!.trim();
+    }
+    if (categoryName != null && categoryName!.trim().isNotEmpty && !isGuidOrIdString(categoryName)) {
+      return categoryName!.trim();
+    }
+    if (specialities != null && specialities!.trim().isNotEmpty && !isGuidOrIdString(specialities)) {
+      final first = specialities!.split(',').first.trim();
+      if (first.isNotEmpty && !isGuidOrIdString(first)) {
+        return first;
+      }
+    }
+    if (tagline != null && tagline!.trim().isNotEmpty && !isGuidOrIdString(tagline)) {
+      return tagline!.trim();
+    }
+    return "Psychic Guide";
   }
 
   /// Stripped clean version of About My Services
@@ -248,8 +270,46 @@ class AdvisorDto {
     final hasCall = commStylesStr.contains('2') || commStylesStr.contains('3') || json['phone1'] != null;
     final hasChat = commStylesStr.contains('1') || json['acceptTextReading'] == true;
 
-    final catName = json['categoryName'] ?? json['category'] ?? json['primaryCategory'];
-    final title = json['advisorTitle'] ?? json['specialities'] ?? json['specialization'] ?? json['briefDescription'] ?? catName;
+    // Category name resolution - ensure category GUIDs are resolved to readable names or discarded
+    String? catNameStr;
+    final rawCatName = json['categoryName']?.toString();
+    final rawCat = json['category']?.toString();
+    final rawPrimCat = json['primaryCategory']?.toString();
+
+    if (rawCatName != null && rawCatName.trim().isNotEmpty && !isGuidOrIdString(rawCatName)) {
+      catNameStr = rawCatName.trim();
+    } else {
+      final candidate = (rawCat != null && rawCat.trim().isNotEmpty)
+          ? rawCat
+          : ((rawPrimCat != null && rawPrimCat.trim().isNotEmpty) ? rawPrimCat : rawCatName);
+      catNameStr = CategoryDto.resolveCategoryNames(candidate);
+    }
+
+    String? advisorTitleStr;
+    final rawAdvisorTitle = json['advisorTitle']?.toString();
+    if (rawAdvisorTitle != null && rawAdvisorTitle.trim().isNotEmpty && !isGuidOrIdString(rawAdvisorTitle)) {
+      advisorTitleStr = rawAdvisorTitle.trim();
+    }
+
+    String? specialitiesStr;
+    final rawSpecialities = json['specialities']?.toString() ?? json['specialization']?.toString();
+    if (rawSpecialities != null && !isGuidOrIdString(rawSpecialities)) {
+      specialitiesStr = rawSpecialities.trim();
+    }
+
+    String? taglineStr;
+    if (advisorTitleStr != null && advisorTitleStr.isNotEmpty) {
+      taglineStr = advisorTitleStr;
+    } else if (catNameStr != null && catNameStr.isNotEmpty) {
+      taglineStr = catNameStr;
+    } else if (specialitiesStr != null && specialitiesStr.isNotEmpty) {
+      taglineStr = specialitiesStr.split(',').first.trim();
+    } else {
+      final brief = json['briefDescription']?.toString();
+      if (brief != null && brief.isNotEmpty && !isGuidOrIdString(brief)) {
+        taglineStr = brief.replaceAll('\n', ' ').trim();
+      }
+    }
 
     final bool online = json['isOnline'] == true || json['status']?.toString() == '1';
     final bool busy = json['isBusy'] == true;
@@ -274,8 +334,8 @@ class AdvisorDto {
       fee: feeVal,
       offeredFee: offeredFeeVal,
       pricePerMinute: effectivePrice,
-      categoryName: catName?.toString(),
-      tagline: title != null ? title.toString().replaceAll('\n', ' ').trim() : null,
+      categoryName: catNameStr,
+      tagline: taglineStr,
       bio: json['aboutMyServices'] ?? json['briefDescription'] ?? json['bio'] ?? json['aboutMe'],
       badgeLabel: badge,
       featured: isFeatured,
@@ -285,10 +345,10 @@ class AdvisorDto {
       hasVideo: hasVideo,
       hasCall: hasCall,
       hasChat: hasChat,
-      advisorTitle: json['advisorTitle']?.toString(),
+      advisorTitle: advisorTitleStr,
       aboutMyServices: json['aboutMyServices']?.toString(),
       experienceAndQualifications: json['experienceAndQualifications']?.toString(),
-      specialities: json['specialities']?.toString(),
+      specialities: specialitiesStr,
       language: json['language']?.toString(),
       commStyles: commStylesStr,
       callRatePerMinute: callRate,

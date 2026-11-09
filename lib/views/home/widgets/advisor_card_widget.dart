@@ -281,7 +281,7 @@ class AdvisorCardWidget extends StatelessWidget {
 
                     // Specialty Tagline
                     Text(
-                      advisor.tagline ?? advisor.categoryName ?? "Psychic & Spiritual Advisor",
+                      advisor.displayTitle,
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondaryLight,
@@ -541,7 +541,7 @@ class AdvisorCardWidget extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      advisor.tagline ?? advisor.categoryName ?? "Psychic Specialist",
+                      advisor.displayTitle,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondaryLight,
