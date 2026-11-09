@@ -4,6 +4,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StorageService {
   static const String keyToken = "jwt_token";
   static const String keyUser = "user_data";
+  static const String keyDevMode = "dev_mode_enabled";
+
+  static Future<void> saveDevMode(bool isDev) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(keyDevMode, isDev);
+  }
+
+  static Future<bool> getDevMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(keyDevMode) ?? false;
+  }
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();

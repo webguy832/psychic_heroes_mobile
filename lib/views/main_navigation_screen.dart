@@ -22,16 +22,66 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  // Demo mode: when true, only Home and Profile menu tabs are shown
-  static const bool _demoOnly = true;
+  int _logoTapCount = 0;
+
+  void _showDevModeDialog(BuildContext context, NavigationProvider nav) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgDarkCard,
+        title: Row(
+          children: const [
+            Icon(Icons.developer_mode_rounded, color: AppColors.accentGold),
+            SizedBox(width: 8),
+            Text("Mode Switcher", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          nav.isDevMode
+              ? "You are currently in Developer Mode (All 5 tabs & all menu items visible).\n\nSwitch to Demo Mode (only Home & Profile visible)?"
+              : "You are currently in Demo Mode (only Home & Profile visible).\n\nSwitch to Developer Mode (all 5 tabs & all menu items visible)?",
+          style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: nav.isDevMode ? Colors.grey[800] : AppColors.accentGold,
+              foregroundColor: nav.isDevMode ? Colors.white : AppColors.primary,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              nav.toggleDevMode();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    nav.isDevMode
+                        ? "🚀 Development Mode Enabled! All menus unlocked."
+                        : "🔒 Demo Mode Enabled: Restricted to Home & Profile.",
+                  ),
+                  backgroundColor: nav.isDevMode ? AppColors.primary : Colors.grey[850],
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Text(nav.isDevMode ? "Switch to Demo Mode" : "Switch to Dev Mode"),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final nav = Provider.of<NavigationProvider>(context);
     final userProv = Provider.of<UserProvider>(context);
     final isAdvisor = userProv.isAdvisor;
+    final isDev = nav.isDevMode;
 
-    final List<Widget> screens = _demoOnly
+    final List<Widget> screens = !isDev
         ? (isAdvisor
             ? const [
                 AdvisorDashboardScreen(),
@@ -57,7 +107,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ProfileScreen(),
               ]);
 
-    final List<BottomNavigationBarItem> navItems = _demoOnly
+    final List<BottomNavigationBarItem> navItems = !isDev
         ? const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
@@ -123,8 +173,60 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
-        title: const AppLogo(iconSize: 22, fontSize: 18),
+        title: GestureDetector(
+          onTap: () {
+            _logoTapCount++;
+            if (_logoTapCount >= 3) {
+              _logoTapCount = 0;
+              nav.toggleDevMode();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    nav.isDevMode
+                        ? "🚀 Development Mode Enabled! (All 5 tabs & all menus unlocked)"
+                        : "🔒 Demo Mode Enabled! (Restricted to Home & Profile)",
+                  ),
+                  backgroundColor: nav.isDevMode ? AppColors.primary : Colors.grey[850],
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+          },
+          child: const AppLogo(iconSize: 22, fontSize: 18),
+        ),
         actions: [
+          // Dev Mode Active Badge in AppBar
+          if (isDev)
+            InkWell(
+              onTap: () => _showDevModeDialog(context, nav),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accentGold, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.developer_mode_rounded, color: AppColors.accentGold, size: 13),
+                    SizedBox(width: 3),
+                    Text(
+                      "DEV",
+                      style: TextStyle(
+                        color: AppColors.accentGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(width: 2),
+
           // Pocket Insight Coin Wallet Balance Badge (🪙 Balance)
           InkWell(
             onTap: () {

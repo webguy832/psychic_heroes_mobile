@@ -29,9 +29,6 @@ class AppDrawerMenu extends StatefulWidget {
 }
 
 class _AppDrawerMenuState extends State<AppDrawerMenu> {
-  // Demo mode: when true, only Home and Profile menu links are shown
-  static const bool _demoOnly = true;
-
   bool _isServicesExpanded = false;
 
   final List<String> _servicesList = [
@@ -49,7 +46,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final userProv = Provider.of<UserProvider>(context);
-    final nav = Provider.of<NavigationProvider>(context, listen: false);
+    final nav = Provider.of<NavigationProvider>(context);
     final user = auth.isLoggedIn ? userProv.user : null;
     final isAdvisor = userProv.isAdvisor;
 
@@ -126,6 +123,61 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
                         ),
                       ),
                   ],
+                ),
+              ],
+            ),
+          ),
+
+          // Development / Demo Mode Toggle in Drawer
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: nav.isDevMode ? const Color(0xFF381052) : AppColors.bgDarkCardElevated,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: nav.isDevMode ? AppColors.accentGold.withOpacity(0.8) : AppColors.borderDark,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      nav.isDevMode ? Icons.developer_mode_rounded : Icons.lock_outline_rounded,
+                      color: nav.isDevMode ? AppColors.accentGold : AppColors.textSecondaryDark,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          nav.isDevMode ? "Dev Mode: All Menus" : "Demo Mode",
+                          style: TextStyle(
+                            color: nav.isDevMode ? Colors.white : AppColors.textPrimaryDark,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          nav.isDevMode ? "All menus & tabs visible" : "Only Home & Profile visible",
+                          style: const TextStyle(
+                            color: AppColors.textSecondaryDark,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: nav.isDevMode,
+                  activeColor: AppColors.accentGold,
+                  onChanged: (val) {
+                    nav.setDevMode(val);
+                  },
                 ),
               ],
             ),
@@ -209,7 +261,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
   }
 
   List<Widget> _buildCustomerMenuItems(BuildContext context, NavigationProvider nav) {
-    if (_demoOnly) {
+    if (!nav.isDevMode) {
       return [
         _buildDrawerTile(
           icon: Icons.home_rounded,
@@ -362,7 +414,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
   }
 
   List<Widget> _buildAdvisorMenuItems(BuildContext context, NavigationProvider nav) {
-    if (_demoOnly) {
+    if (!nav.isDevMode) {
       return [
         _buildDrawerTile(
           icon: Icons.home_rounded,

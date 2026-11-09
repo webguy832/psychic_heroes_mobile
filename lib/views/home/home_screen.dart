@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_styles.dart';
 import '../../models/advisor_model.dart';
 import '../../providers/home_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../shared/loading_indicator.dart';
 import '../shared/app_footer_widget.dart';
 import 'widgets/home_slider_widget.dart';
@@ -288,6 +289,84 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Dev / Demo Mode Quick Toggle Banner
+                    Consumer<NavigationProvider>(
+                      builder: (context, nav, _) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: nav.isDevMode ? const Color(0xFF2B0844) : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: nav.isDevMode ? AppColors.accentGold.withOpacity(0.8) : const Color(0xFFEADBFF),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                nav.isDevMode ? Icons.developer_mode_rounded : Icons.lock_outline_rounded,
+                                size: 16,
+                                color: nav.isDevMode ? AppColors.accentGold : AppColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  nav.isDevMode
+                                      ? "Dev Mode Active: All 5 tabs & all menus enabled"
+                                      : "Demo Mode Active: Only Home & Profile visible",
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: nav.isDevMode ? Colors.white : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  nav.toggleDevMode();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        nav.isDevMode
+                                            ? "🚀 Development Mode Enabled! All 5 tabs & all menus unlocked."
+                                            : "🔒 Demo Mode Enabled: Restricted to Home and Profile.",
+                                      ),
+                                      backgroundColor: nav.isDevMode ? AppColors.primary : Colors.grey[850],
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: nav.isDevMode ? AppColors.accentGold : AppColors.primary,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    nav.isDevMode ? "Switch to Demo" : "Enable Dev Mode",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: nav.isDevMode ? AppColors.primary : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+
                     // 1. Pocket Insight Style Search & Filter Toolbar
                     Row(
                       children: [
