@@ -1,6 +1,26 @@
 import '../core/constants/api_endpoints.dart';
 import '../core/network/api_client.dart';
 
+class AcceptChatResult {
+  final bool success;
+  final double? advisorFee;
+  final double? advisorOriginalFees;
+  final int? freeMinutes;
+  final int? complimentaryMins;
+  final int? validSessionMinutes;
+  final Map<String, dynamic>? data;
+
+  AcceptChatResult({
+    required this.success,
+    this.advisorFee,
+    this.advisorOriginalFees,
+    this.freeMinutes,
+    this.complimentaryMins,
+    this.validSessionMinutes,
+    this.data,
+  });
+}
+
 class StartChatResult {
   final bool success;
   final String? requestId;
@@ -67,7 +87,7 @@ class ChatService {
   }
 
   /// Advisor accepts a chat request via api/Chat/AcceptChat
-  Future<bool> acceptChat(String requestId, {String connectId = 'mobile'}) async {
+  Future<AcceptChatResult> acceptChat(String requestId, {String connectId = 'mobile'}) async {
     try {
       final endpoint = "${ApiEndpoints.acceptChat}?requestId=$requestId&connectId=$connectId";
       final response = await ApiClient.post(
@@ -75,11 +95,59 @@ class ChatService {
         requiresAuth: true,
       );
       if (response is Map) {
-        return response['status'] == 'success' || response['isSuccess'] == true || response['success'] == true;
+        final bool ok = response['status'] == 'success' ||
+            response['isSuccess'] == true ||
+            response['success'] == true;
+        final data = response['data'] is Map ? response['data'] as Map : null;
+        double? fee;
+        double? originalFee;
+        int? freeMins;
+        int? compMins;
+        int? validMins;
+
+        if (data != null) {
+          final rawFee = data['advisorFee'] ??
+              data['AdvisorFee'] ??
+              data['advisorProfile']?['offeredFee'] ??
+              data['advisorProfile']?['fee'];
+          if (rawFee is num) {
+            fee = rawFee.toDouble();
+          } else if (rawFee != null) {
+            fee = double.tryParse(rawFee.toString());
+          }
+
+          final rawOrig = data['advisorOriginalFees'] ??
+              data['AdvisorOriginalFees'] ??
+              data['advisorProfile']?['fee'];
+          if (rawOrig is num) {
+            originalFee = rawOrig.toDouble();
+          } else if (rawOrig != null) {
+            originalFee = double.tryParse(rawOrig.toString());
+          }
+
+          final rawFree = data['freeMinutes'] ?? data['FreeMinutes'];
+          if (rawFree is num) freeMins = rawFree.toInt();
+
+          final rawComp = data['complimentaryMins'] ?? data['ComplimentaryMins'];
+          if (rawComp is num) compMins = rawComp.toInt();
+
+          final rawValid = data['validSessionMinutes'] ?? data['ValidSessionMinutes'];
+          if (rawValid is num) validMins = rawValid.toInt();
+        }
+
+        return AcceptChatResult(
+          success: ok,
+          advisorFee: fee,
+          advisorOriginalFees: originalFee,
+          freeMinutes: freeMins,
+          complimentaryMins: compMins,
+          validSessionMinutes: validMins,
+          data: data != null ? Map<String, dynamic>.from(data) : null,
+        );
       }
-      return true;
+      return AcceptChatResult(success: true);
     } catch (_) {
-      return false;
+      return AcceptChatResult(success: false);
     }
   }
 

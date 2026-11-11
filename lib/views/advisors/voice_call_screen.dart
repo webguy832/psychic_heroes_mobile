@@ -54,6 +54,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
             duration: const Duration(seconds: 3),
           ),
         );
+        final summaryCost = sessionProv.chatSummary?['chargedAmount'] ??
+            sessionProv.chatSummary?['totalCharges'] ??
+            sessionProv.chatSummary?['ChargedAmount'];
+        final finalCost = (summaryCost is num) ? summaryCost.toDouble() : sessionProv.currentSessionCost;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -61,7 +66,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
               isAdvisorView: widget.isAdvisorView,
               participantName: titleName,
               formattedTime: sessionProv.formattedTimer,
-              totalCost: sessionProv.currentSessionCost,
+              totalCost: finalCost,
               sessionTypeLabel: "Voice Call",
             ),
           ),
@@ -210,8 +215,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                   const SizedBox(width: 8),
                   Text(
                     sessionProv.isChargingStarted
-                        ? "HD Voice Connected • \$${activeReq?.ratePerMinute ?? 3.99}/min (Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)})"
-                        : "HD Voice Connected • \$${activeReq?.ratePerMinute ?? 3.99}/min (Grace: ${sessionProv.secondsUntilCharging}s left)",
+                        ? "HD Voice Connected • \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)})"
+                        : "HD Voice Connected • \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Grace: ${sessionProv.secondsUntilCharging}s left)",
                     style: TextStyle(
                       fontSize: 13,
                       color: sessionProv.isChargingStarted ? AppColors.onlineGreen : AppColors.accentGold,
@@ -425,6 +430,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
               final costVal = sessionProv.currentSessionCost;
               Navigator.pop(ctx);
               await sessionProv.endSession();
+              final summaryCost = sessionProv.chatSummary?['chargedAmount'] ??
+                  sessionProv.chatSummary?['totalCharges'] ??
+                  sessionProv.chatSummary?['ChargedAmount'];
+              final finalCost = (summaryCost is num) ? summaryCost.toDouble() : costVal;
+
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -432,7 +442,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                     isAdvisorView: widget.isAdvisorView,
                     participantName: titleName,
                     formattedTime: durationStr,
-                    totalCost: costVal,
+                    totalCost: finalCost,
                     sessionTypeLabel: "Voice Call",
                   ),
                 ),

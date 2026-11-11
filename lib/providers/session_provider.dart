@@ -49,9 +49,9 @@ class SessionRequestItem {
   final String advisorId;
   final String advisorName;
   final SessionType type;
-  final double ratePerMinute;
-  final int freeMinutes;
-  final double userBalance;
+  double ratePerMinute;
+  int freeMinutes;
+  double userBalance;
   final DateTime createdAt;
   bool isAccepted;
 
@@ -108,6 +108,7 @@ class SessionProvider extends ChangeNotifier {
   // Overview stats
   double _totalEarningsToday = 1420.50;
   int _completedSessionsToday = 14;
+  double _advisorBaseRate = 0.49;
 
   // Current user identifiers for message attribution & role
   String _currentUserId = '';
@@ -132,6 +133,7 @@ class SessionProvider extends ChangeNotifier {
   String get declineTitle => _declineTitle;
   String get declineMessage => _declineMessage;
   Map<String, dynamic>? get chatSummary => _chatSummary;
+  double get advisorBaseRate => _advisorBaseRate;
 
   bool get isMuted => _isMuted;
   bool get isSpeakerOn => _isSpeakerOn;
@@ -214,7 +216,7 @@ class SessionProvider extends ChangeNotifier {
 
   /// Cost calculation reflecting free promotional time vs paid minutes
   double get currentSessionCost {
-    final rate = _activeRequest?.ratePerMinute ?? 3.99;
+    final rate = _activeRequest?.ratePerMinute ?? _advisorBaseRate;
     if (_freeLeftSeconds > 0 && billedMinutes == 0) return 0.0;
     return billedMinutes * rate;
   }
@@ -269,7 +271,7 @@ class SessionProvider extends ChangeNotifier {
     required String advisorId,
     required String advisorName,
     required SessionType type,
-    double ratePerMinute = 3.99,
+    double ratePerMinute = 0.49,
     int freeMinutes = 0,
     double userBalance = 0.0,
   }) async {
@@ -391,7 +393,7 @@ class SessionProvider extends ChangeNotifier {
     String clientId = "client",
     String clientName = "Client",
     SessionType type = SessionType.chat,
-    double ratePerMinute = 3.99,
+    double ratePerMinute = 0.49,
   }) {
     initiateSessionRequest(
       clientId: clientId,
@@ -465,7 +467,7 @@ class SessionProvider extends ChangeNotifier {
       type: req.requestType == 2
           ? SessionType.video
           : (req.requestType == 3 ? SessionType.call : SessionType.chat),
-      ratePerMinute: 3.99,
+      ratePerMinute: _advisorBaseRate,
       createdAt: req.requestedAtUtc,
     );
 
@@ -657,7 +659,7 @@ class SessionProvider extends ChangeNotifier {
         return;
       }
 
-      final rate = _activeRequest?.ratePerMinute ?? 3.99;
+      final rate = _activeRequest?.ratePerMinute ?? _advisorBaseRate;
       const deductAtSecond = 45;
 
       // 1) Free wallet deduction at 45s, 105s, etc.
@@ -812,21 +814,39 @@ class SessionProvider extends ChangeNotifier {
     if (savedProfileId != null && savedProfileId.isNotEmpty) {
       effectiveProfileId = savedProfileId;
     }
-    if (effectiveProfileId.isEmpty || effectiveProfileId == userId) {
-      try {
-        final advDetails = await _chatService.getAdvisorProfileDetails();
-        if (advDetails != null) {
-          final pid = advDetails['id']?.toString() ??
-              advDetails['Id']?.toString() ??
-              advDetails['userProfile']?['id']?.toString() ??
-              advDetails['userProfile']?['Id']?.toString();
-          if (pid != null && pid.isNotEmpty) {
-            effectiveProfileId = pid;
-            await StorageService.saveAdvisorProfileId(pid);
-          }
+    try {
+      final advDetails = await _chatService.getAdvisorProfileDetails();
+      if (advDetails != null) {
+        final pid = advDetails['id']?.toString() ??
+            advDetails['Id']?.toString() ??
+            advDetails['userProfile']?['id']?.toString() ??
+            advDetails['userProfile']?['Id']?.toString();
+        if (pid != null && pid.isNotEmpty) {
+          effectiveProfileId = pid;
+          await StorageService.saveAdvisorProfileId(pid);
         }
-      } catch (_) {}
-    }
+
+        // Extract base rate from advisor profile (OfferedFee or Fee)
+        final rawOffered = advDetails['offeredFee'] ?? advDetails['OfferedFee'];
+        final rawFee = advDetails['fee'] ?? advDetails['Fee'];
+        double? parsedFee;
+        if (rawOffered is num && rawOffered > 0) {
+          parsedFee = rawOffered.toDouble();
+        } else if (rawFee is num && rawFee > 0) {
+          parsedFee = rawFee.toDouble();
+        } else if (rawOffered != null) {
+          final val = double.tryParse(rawOffered.toString());
+          if (val != null && val > 0) parsedFee = val;
+        }
+        if (parsedFee == null && rawFee != null) {
+          final val = double.tryParse(rawFee.toString());
+          if (val != null && val > 0) parsedFee = val;
+        }
+        if (parsedFee != null && parsedFee > 0) {
+          _advisorBaseRate = parsedFee;
+        }
+      }
+    } catch (_) {}
 
     _currentAdvisorProfileId = effectiveProfileId;
 
@@ -873,8 +893,10 @@ class SessionProvider extends ChangeNotifier {
               r['userName']?.toString() ??
               'Valued Client';
           final clientId = r['clientId']?.toString() ?? r['ClientId']?.toString() ?? '';
-          final rateVal = r['ratePerMinute'] ?? r['RatePerMinute'] ?? 3.99;
-          final double rate = (rateVal is num) ? rateVal.toDouble() : double.tryParse(rateVal.toString()) ?? 3.99;
+          final rateVal = r['ratePerMinute'] ?? r['RatePerMinute'];
+          final double rate = (rateVal is num)
+              ? rateVal.toDouble()
+              : (double.tryParse(rateVal?.toString() ?? '') ?? _advisorBaseRate);
           final reqTypeVal = r['requestType'] ?? r['RequestType'] ?? 1;
           final int reqTypeInt = (reqTypeVal is num) ? reqTypeVal.toInt() : int.tryParse(reqTypeVal.toString()) ?? 1;
 
@@ -926,8 +948,39 @@ class SessionProvider extends ChangeNotifier {
     } catch (_) {}
 
     final connId = _signalR.connectionId.isNotEmpty ? _signalR.connectionId : 'mobile';
-    final success = await _chatService.acceptChat(req.id, connectId: connId);
+    final acceptResult = await _chatService.acceptChat(req.id, connectId: connId);
     req.isAccepted = true;
+
+    // Dynamically update ratePerMinute and free minutes from backend AcceptChat response
+    if (acceptResult.advisorFee != null && acceptResult.advisorFee! > 0) {
+      req.ratePerMinute = acceptResult.advisorFee!;
+      _advisorBaseRate = acceptResult.advisorFee!;
+      if (_activeRequest?.id == req.id) {
+        _activeRequest?.ratePerMinute = acceptResult.advisorFee!;
+      }
+    }
+    if (acceptResult.freeMinutes != null && acceptResult.freeMinutes! > 0) {
+      req.freeMinutes = acceptResult.freeMinutes!;
+      _freeLeftSeconds = acceptResult.freeMinutes! * 60;
+    }
+
+    // Safety check: if rate is still missing or invalid, query SessionDetails
+    if (req.ratePerMinute <= 0) {
+      try {
+        final sDetails = await _chatService.getSessionDetails(req.id);
+        if (sDetails != null) {
+          final feeVal = sDetails['advisorFee'] ?? sDetails['AdvisorFee'];
+          if (feeVal is num && feeVal > 0) {
+            req.ratePerMinute = feeVal.toDouble();
+            _advisorBaseRate = feeVal.toDouble();
+            if (_activeRequest?.id == req.id) {
+              _activeRequest?.ratePerMinute = feeVal.toDouble();
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     _startBillingTimer();
 
     // Connect advisor to SignalR chat session group & register advisor connection info (matching Angular parity)
@@ -944,7 +997,7 @@ class SessionProvider extends ChangeNotifier {
     await _loadInitialChatHistory(req.id);
 
     notifyListeners();
-    return success;
+    return acceptResult.success;
   }
 
   Future<void> declineSessionRequest(SessionRequestItem req) async {
@@ -984,6 +1037,14 @@ class SessionProvider extends ChangeNotifier {
       _signalR.endChat(reqId, totalSecs);
       await _chatService.endChatSession(reqId, totalSecs, connectionId: _signalR.connectionId);
       _chatSummary = await _chatService.getSessionSummary(reqId);
+      if (_chatSummary != null) {
+        final finalCharge = _chatSummary!['chargedAmount'] ??
+            _chatSummary!['ChargedAmount'] ??
+            _chatSummary!['totalCharges'];
+        if (finalCharge is num && _activeRequest != null) {
+          _totalEarningsToday = _totalEarningsToday - currentSessionCost + finalCharge.toDouble();
+        }
+      }
     }
 
     _sessionState = SessionState.ended;
