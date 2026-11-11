@@ -144,4 +144,17 @@ class AdvisorService {
     }
     throw Exception("Failed to check session eligibility");
   }
+
+  /// Fetches advisor's own profile details (including Guid profile ID) via api/advisor/GetAdvisorProfileDetails
+  Future<Map<String, dynamic>?> getAdvisorProfileDetails() async {
+    try {
+      final response = await ApiClient.get("api/advisor/GetAdvisorProfileDetails", requiresAuth: true);
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

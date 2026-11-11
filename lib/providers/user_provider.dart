@@ -3,12 +3,15 @@ import '../core/utils/storage_service.dart';
 import '../models/user_model.dart';
 import '../models/notification_model.dart';
 import '../services/user_service.dart';
+import '../services/advisor_service.dart';
 import '../services/signalr_service.dart';
 
 class UserProvider extends ChangeNotifier {
   final UserService _userService = UserService();
+  final AdvisorService _advisorService = AdvisorService();
 
   UserModel? _user;
+  String? _advisorProfileId;
   List<BillingAddressDto> _billingAddresses = [];
   List<NotificationDto> _notifications = [];
   List<TransactionHistoryDto> _transactions = [];
@@ -17,6 +20,7 @@ class UserProvider extends ChangeNotifier {
   String? _errorMessage;
 
   UserModel? get user => _user;
+  String? get advisorProfileId => _advisorProfileId;
   List<BillingAddressDto> get billingAddresses => _billingAddresses;
   List<NotificationDto> get notifications => _notifications;
   List<TransactionHistoryDto> get transactions => _transactions;
@@ -49,12 +53,42 @@ class UserProvider extends ChangeNotifier {
 
   void clearUser() {
     _user = null;
+    _advisorProfileId = null;
     _billingAddresses = [];
     _notifications = [];
     _transactions = [];
     _readingHistory = [];
     SignalRService().disconnect();
     notifyListeners();
+  }
+
+  /// Resolves the actual Advisor Profile GUID for this advisor user (parity with Angular GetAdvisorProfileDetails)
+  Future<String?> getOrFetchAdvisorProfileId() async {
+    if (_advisorProfileId != null && _advisorProfileId!.isNotEmpty) {
+      return _advisorProfileId;
+    }
+    final saved = await StorageService.getAdvisorProfileId();
+    if (saved != null && saved.isNotEmpty) {
+      _advisorProfileId = saved;
+      return saved;
+    }
+    if (isAdvisor) {
+      try {
+        final advDetails = await _advisorService.getAdvisorProfileDetails();
+        if (advDetails != null) {
+          final profId = advDetails['id']?.toString() ??
+              advDetails['Id']?.toString() ??
+              advDetails['userProfile']?['id']?.toString() ??
+              advDetails['userProfile']?['Id']?.toString();
+          if (profId != null && profId.isNotEmpty) {
+            _advisorProfileId = profId;
+            await StorageService.saveAdvisorProfileId(profId);
+            return profId;
+          }
+        }
+      } catch (_) {}
+    }
+    return _user?.id;
   }
 
   Future<void> fetchUserProfile() async {
@@ -97,12 +131,38 @@ class UserProvider extends ChangeNotifier {
 
       await StorageService.saveUser(_user!.toJson());
 
+      // If advisor, fetch and cache the true advisor profile GUID (matching web_angular_2025 GetAdvisorProfileDetails)
+      String effectiveAdvProfileId = '';
+      if (isAdvisor) {
+        try {
+          final savedAdvId = await StorageService.getAdvisorProfileId();
+          if (savedAdvId != null && savedAdvId.isNotEmpty) {
+            effectiveAdvProfileId = savedAdvId;
+            _advisorProfileId = savedAdvId;
+          }
+          final advDetails = await _advisorService.getAdvisorProfileDetails();
+          if (advDetails != null) {
+            final profId = advDetails['id']?.toString() ??
+                advDetails['Id']?.toString() ??
+                advDetails['userProfile']?['id']?.toString() ??
+                advDetails['userProfile']?['Id']?.toString();
+            if (profId != null && profId.isNotEmpty) {
+              effectiveAdvProfileId = profId;
+              _advisorProfileId = profId;
+              await StorageService.saveAdvisorProfileId(profId);
+            }
+          }
+        } catch (e) {
+          debugPrint("Failed to fetch advisor profile details: $e");
+        }
+      }
+
       // Register presence on SignalR Hub (matching web_angular_2025 parity)
       try {
         SignalRService().ensureConnected(
           userName: _user!.displayName.isNotEmpty ? _user!.displayName : 'User',
           userId: _user!.id,
-          advisorProfileId: isAdvisor ? _user!.id : '',
+          advisorProfileId: effectiveAdvProfileId,
           isAdvisor: isAdvisor,
         );
       } catch (e) {

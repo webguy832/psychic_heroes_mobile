@@ -22,13 +22,24 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = Provider.of<UserProvider>(context, listen: false).user;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final userProv = Provider.of<UserProvider>(context, listen: false);
       final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+      final user = userProv.user;
       if (user != null && user.id.isNotEmpty) {
-        sessionProv.startAdvisorPolling(user.id, advisorName: user.displayName, userId: user.id);
+        final profileId = await userProv.getOrFetchAdvisorProfileId();
+        final effectiveId = (profileId != null && profileId.isNotEmpty) ? profileId : user.id;
+        sessionProv.startAdvisorPolling(effectiveId, advisorName: user.displayName, userId: user.id);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    try {
+      Provider.of<SessionProvider>(context, listen: false).stopAdvisorPolling();
+    } catch (_) {}
+    super.dispose();
   }
 
   void _checkAndShowIncomingRequestDialog(BuildContext context, SessionProvider sessionProv) {

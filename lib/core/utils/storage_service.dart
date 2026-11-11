@@ -5,6 +5,7 @@ class StorageService {
   static const String keyToken = "jwt_token";
   static const String keyUser = "user_data";
   static const String keyDevMode = "dev_mode_enabled";
+  static const String keyAdvisorProfileId = "advisor_profile_id";
 
   static Future<void> saveDevMode(bool isDev) async {
     final prefs = await SharedPreferences.getInstance();
@@ -113,9 +114,20 @@ class StorageService {
     return null;
   }
 
+  static Future<void> saveAdvisorProfileId(String profileId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyAdvisorProfileId, profileId);
+  }
+
+  static Future<String?> getAdvisorProfileId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(keyAdvisorProfileId);
+  }
+
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(keyToken);
     await prefs.remove(keyUser);
+    await prefs.remove(keyAdvisorProfileId);
   }
 }

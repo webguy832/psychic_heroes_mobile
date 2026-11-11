@@ -34,13 +34,35 @@ class IncomingChatRequestRealtime {
 
   factory IncomingChatRequestRealtime.fromJson(Map<String, dynamic> json) {
     return IncomingChatRequestRealtime(
-      requestId: json['requestId']?.toString() ?? json['RequestId']?.toString() ?? '',
-      requestType: json['requestType'] ?? json['RequestType'] ?? 1,
-      clientId: json['clientId']?.toString() ?? json['ClientId']?.toString() ?? '',
-      advisorId: json['advisorId']?.toString() ?? json['AdvisorId']?.toString() ?? '',
-      clientName: json['clientName']?.toString() ?? json['ClientName']?.toString(),
-      requestedAtUtc: DateTime.tryParse(json['requestedAtUtc']?.toString() ?? '') ?? DateTime.now(),
-      expiresInSeconds: json['expiresInSeconds'] ?? json['ExpiresInSeconds'] ?? 60,
+      requestId: json['requestId']?.toString() ??
+          json['RequestId']?.toString() ??
+          json['id']?.toString() ??
+          json['Id']?.toString() ??
+          json['sessionId']?.toString() ??
+          json['SessionId']?.toString() ??
+          json['CallRequestId']?.toString() ??
+          '',
+      requestType: (json['requestType'] is num)
+          ? (json['requestType'] as num).toInt()
+          : ((json['RequestType'] is num) ? (json['RequestType'] as num).toInt() : 1),
+      clientId: json['clientId']?.toString() ??
+          json['ClientId']?.toString() ??
+          json['fromUser']?.toString() ??
+          '',
+      advisorId: json['advisorId']?.toString() ??
+          json['AdvisorId']?.toString() ??
+          json['advisorProfileId']?.toString() ??
+          json['AdvisorProfileId']?.toString() ??
+          '',
+      clientName: json['clientName']?.toString() ??
+          json['ClientName']?.toString() ??
+          json['CustomerName']?.toString() ??
+          json['clientScreenName']?.toString() ??
+          json['ClientScreenName']?.toString() ??
+          json['customerName']?.toString() ??
+          json['userName']?.toString(),
+      requestedAtUtc: DateTime.tryParse(json['requestedAtUtc']?.toString() ?? json['RequestedAtUtc']?.toString() ?? '') ?? DateTime.now(),
+      expiresInSeconds: json['expiresInSeconds'] ?? json['ExpiresInSeconds'] ?? json['TimeoutSeconds'] ?? 60,
     );
   }
 }
@@ -373,6 +395,11 @@ class SignalRService {
 
       case 'advisor.request.incoming':
       case 'incomingSession':
+      case 'incomingVideoSession':
+      case 'IncomingCallRequest':
+      case 'incomingCallRequest':
+      case 'notificationChat':
+      case 'notification':
         if (args.isNotEmpty && args[0] is Map) {
           final req = IncomingChatRequestRealtime.fromJson(args[0] as Map<String, dynamic>);
           _incomingRequestController.add(req);
@@ -421,12 +448,17 @@ class SignalRService {
         _savedAdvisorProfileId.isNotEmpty ? _savedAdvisorProfileId : null,
       ]);
 
-      if (_savedIsAdvisor && _savedAdvisorProfileId.isNotEmpty) {
-        await invoke('RegisterAdvisor', [_savedAdvisorProfileId]);
+      if (_savedIsAdvisor) {
+        if (_savedAdvisorProfileId.isNotEmpty) {
+          await invoke('RegisterAdvisor', [_savedAdvisorProfileId]);
+        }
+        if (_savedUserId.isNotEmpty && _savedUserId != _savedAdvisorProfileId) {
+          await invoke('RegisterAdvisor', [_savedUserId]);
+        }
       } else {
         await invoke('RegisterCustomer', [_savedUserId]);
       }
-      debugPrint("SignalR presence registered successfully for $_savedUserName");
+      debugPrint("SignalR presence registered successfully for $_savedUserName (isAdvisor: $_savedIsAdvisor, advisorProfileId: $_savedAdvisorProfileId)");
     } catch (e) {
       debugPrint("RegisterPresence error: $e");
     }

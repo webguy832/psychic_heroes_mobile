@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../core/utils/storage_service.dart';
 import '../services/chat_service.dart';
 import '../services/signalr_service.dart';
 
@@ -82,9 +83,11 @@ class SessionProvider extends ChangeNotifier {
   List<SessionRequestItem> _incomingRequests = [];
   List<ChatMessageItem> _chatMessages = [];
 
-  // Active timers (Only UI countdowns & billing tickers - zero HTTP polling loops!)
+  // Active timers & safety nets
   Timer? _sessionTimer;
   Timer? _waitingTimer;
+  Timer? _advisorIncomingRequestsTimer;
+  String? _currentAdvisorProfileId;
 
   int _elapsedSeconds = 0;
   int _waitingSecondsLeft = 60;
@@ -733,35 +736,86 @@ class SessionProvider extends ChangeNotifier {
   }
 
   // ==========================================================
-  // ADVISOR PRESENCE & ACTIONS (SIGNALR REAL-TIME PUSH)
+  // ADVISOR PRESENCE & ACTIONS (SIGNALR REAL-TIME PUSH + SAFETY NET POLL)
   // ==========================================================
   Future<void> startAdvisorPolling(String advisorProfileId, {String advisorName = 'Advisor', String userId = ''}) async {
     _currentUserId = userId.isNotEmpty ? userId : advisorProfileId;
     _currentUserName = advisorName;
+    _isCurrentUserAdvisor = true;
 
-    // Connect to SignalR as Advisor (Zero polling!)
+    // Resolve advisor profile GUID if not passed properly (parity with Angular GetAdvisorProfileDetails)
+    String effectiveProfileId = advisorProfileId;
+    final savedProfileId = await StorageService.getAdvisorProfileId();
+    if (savedProfileId != null && savedProfileId.isNotEmpty) {
+      effectiveProfileId = savedProfileId;
+    }
+    if (effectiveProfileId.isEmpty || effectiveProfileId == userId) {
+      try {
+        final advDetails = await _chatService.getAdvisorProfileDetails();
+        if (advDetails != null) {
+          final pid = advDetails['id']?.toString() ??
+              advDetails['Id']?.toString() ??
+              advDetails['userProfile']?['id']?.toString() ??
+              advDetails['userProfile']?['Id']?.toString();
+          if (pid != null && pid.isNotEmpty) {
+            effectiveProfileId = pid;
+            await StorageService.saveAdvisorProfileId(pid);
+          }
+        }
+      } catch (_) {}
+    }
+
+    _currentAdvisorProfileId = effectiveProfileId;
+
+    // 1. Connect to SignalR as Advisor with presence and registration
     try {
       await _signalR.ensureConnected(
         userName: advisorName,
         userId: _currentUserId,
-        advisorProfileId: advisorProfileId,
+        advisorProfileId: effectiveProfileId,
         isAdvisor: true,
       );
+    } catch (e) {
+      debugPrint("startAdvisorPolling SignalR error: $e");
+    }
 
-      // Single initial fetch of any existing pending requests
+    // 2. Immediate check for any incoming requests
+    await _pollAdvisorRequestsOnce(effectiveProfileId, advisorName);
+
+    // 3. Fallback recurring polling safety net (every 3s while idle on dashboard)
+    _advisorIncomingRequestsTimer?.cancel();
+    _advisorIncomingRequestsTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_sessionState == SessionState.idle || _sessionState == SessionState.declined || _sessionState == SessionState.cancelled) {
+        _pollAdvisorRequestsOnce(effectiveProfileId, advisorName);
+      }
+    });
+  }
+
+  Future<void> _pollAdvisorRequestsOnce(String advisorProfileId, String advisorName) async {
+    if (!_isAdvisorOnline) return;
+    try {
       final requests = await _chatService.getChatRequests(advisorProfileId);
       if (requests.isNotEmpty) {
-        final List<SessionRequestItem> mapped = [];
+        bool changed = false;
         for (var r in requests) {
-          final id = r['requestId']?.toString() ?? r['RequestId']?.toString() ?? '';
+          final id = r['requestId']?.toString() ?? r['RequestId']?.toString() ?? r['id']?.toString() ?? '';
           if (id.isEmpty) continue;
-          final clientName = r['clientName']?.toString() ?? r['ClientName']?.toString() ?? 'Valued Client';
+          if (_incomingRequests.any((existing) => existing.id == id)) continue;
+
+          final clientName = r['clientName']?.toString() ??
+              r['ClientName']?.toString() ??
+              r['clientScreenName']?.toString() ??
+              r['ClientScreenName']?.toString() ??
+              r['customerName']?.toString() ??
+              r['userName']?.toString() ??
+              'Valued Client';
           final clientId = r['clientId']?.toString() ?? r['ClientId']?.toString() ?? '';
           final rateVal = r['ratePerMinute'] ?? r['RatePerMinute'] ?? 3.99;
           final double rate = (rateVal is num) ? rateVal.toDouble() : double.tryParse(rateVal.toString()) ?? 3.99;
-          final reqTypeInt = r['requestType'] ?? r['RequestType'] ?? 1;
+          final reqTypeVal = r['requestType'] ?? r['RequestType'] ?? 1;
+          final int reqTypeInt = (reqTypeVal is num) ? reqTypeVal.toInt() : int.tryParse(reqTypeVal.toString()) ?? 1;
 
-          mapped.add(SessionRequestItem(
+          _incomingRequests.add(SessionRequestItem(
             id: id,
             clientId: clientId,
             clientName: clientName,
@@ -771,32 +825,37 @@ class SessionProvider extends ChangeNotifier {
             ratePerMinute: rate,
             createdAt: DateTime.now(),
           ));
+          changed = true;
         }
-
-        if (mapped.isNotEmpty) {
-          _incomingRequests = mapped;
+        if (changed) {
           notifyListeners();
         }
       }
-    } catch (e) {
-      debugPrint("startAdvisorPolling SignalR error: $e");
-    }
+    } catch (_) {}
   }
 
   void stopAdvisorPolling() {
-    // Zero polling timers to cancel; incoming requests arrive via SignalR push
+    _advisorIncomingRequestsTimer?.cancel();
+    _advisorIncomingRequestsTimer = null;
   }
 
   Future<bool> acceptSessionRequest(SessionRequestItem req) async {
+    _advisorIncomingRequestsTimer?.cancel();
+    _advisorIncomingRequestsTimer = null;
     _isCurrentUserAdvisor = true;
-    _currentUserId = req.advisorId;
+    _currentUserId = _currentAdvisorProfileId ?? req.advisorId;
     _currentUserName = req.advisorName;
+    _activeRequest = req;
+    _incomingRequests.clear();
+    _sessionState = SessionState.active;
+    notifyListeners();
 
     // Ensure advisor SignalR connection is active with presence
     try {
       await _signalR.ensureConnected(
         userName: req.advisorName,
-        userId: req.advisorId,
+        userId: _currentUserId,
+        advisorProfileId: _currentAdvisorProfileId ?? req.advisorId,
         isAdvisor: true,
         requestId: req.id,
       );
@@ -805,9 +864,6 @@ class SessionProvider extends ChangeNotifier {
     final connId = _signalR.connectionId.isNotEmpty ? _signalR.connectionId : 'mobile';
     final success = await _chatService.acceptChat(req.id, connectId: connId);
     req.isAccepted = true;
-    _activeRequest = req;
-    _incomingRequests.clear();
-    _sessionState = SessionState.active;
     _startBillingTimer();
 
     // Connect advisor to SignalR chat session group & register advisor connection info (matching Angular parity)
@@ -891,5 +947,7 @@ class SessionProvider extends ChangeNotifier {
     _sessionTimer = null;
     _waitingTimer?.cancel();
     _waitingTimer = null;
+    _advisorIncomingRequestsTimer?.cancel();
+    _advisorIncomingRequestsTimer = null;
   }
 }

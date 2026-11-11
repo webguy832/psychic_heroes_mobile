@@ -45,7 +45,7 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
   }
 
   void _checkAutoClose(SessionProvider sessionProv, String titleName) {
-    if ((sessionProv.sessionState == SessionState.ended || sessionProv.sessionState == SessionState.idle) && !_handledSessionEnd) {
+    if (sessionProv.sessionState == SessionState.ended && !_handledSessionEnd) {
       _handledSessionEnd = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
