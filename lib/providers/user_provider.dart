@@ -3,6 +3,7 @@ import '../core/utils/storage_service.dart';
 import '../models/user_model.dart';
 import '../models/notification_model.dart';
 import '../services/user_service.dart';
+import '../services/signalr_service.dart';
 
 class UserProvider extends ChangeNotifier {
   final UserService _userService = UserService();
@@ -52,6 +53,7 @@ class UserProvider extends ChangeNotifier {
     _notifications = [];
     _transactions = [];
     _readingHistory = [];
+    SignalRService().disconnect();
     notifyListeners();
   }
 
@@ -94,6 +96,18 @@ class UserProvider extends ChangeNotifier {
       );
 
       await StorageService.saveUser(_user!.toJson());
+
+      // Register presence on SignalR Hub (matching web_angular_2025 parity)
+      try {
+        SignalRService().ensureConnected(
+          userName: _user!.displayName.isNotEmpty ? _user!.displayName : 'User',
+          userId: _user!.id,
+          advisorProfileId: isAdvisor ? _user!.id : '',
+          isAdvisor: isAdvisor,
+        );
+      } catch (e) {
+        debugPrint("SignalR auto-connect error: $e");
+      }
     } catch (e) {
       _errorMessage = e.toString();
     } finally {

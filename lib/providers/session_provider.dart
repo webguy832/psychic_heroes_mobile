@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/chat_service.dart';
+import '../services/signalr_service.dart';
 
 enum SessionType { call, chat, video }
 
@@ -72,6 +71,8 @@ class SessionRequestItem {
 
 class SessionProvider extends ChangeNotifier {
   final ChatService _chatService = ChatService();
+  final SignalRService _signalR = SignalRService();
+  final List<StreamSubscription> _signalRSubs = [];
 
   bool _isAdvisorOnline = true;
   SessionState _sessionState = SessionState.idle;
@@ -81,12 +82,9 @@ class SessionProvider extends ChangeNotifier {
   List<SessionRequestItem> _incomingRequests = [];
   List<ChatMessageItem> _chatMessages = [];
 
-  // Active timers
+  // Active timers (Only UI countdowns & billing tickers - zero HTTP polling loops!)
   Timer? _sessionTimer;
   Timer? _waitingTimer;
-  Timer? _pollAcceptanceTimer;
-  Timer? _chatMessagePollTimer;
-  Timer? _advisorIncomingRequestsTimer;
 
   int _elapsedSeconds = 0;
   int _waitingSecondsLeft = 60;
@@ -107,6 +105,10 @@ class SessionProvider extends ChangeNotifier {
   // Overview stats
   double _totalEarningsToday = 1420.50;
   int _completedSessionsToday = 14;
+
+  // Current user identifiers for message attribution
+  String _currentUserId = '';
+  String _currentUserName = '';
 
   // Getters
   bool get isAdvisorOnline => _isAdvisorOnline;
@@ -132,12 +134,61 @@ class SessionProvider extends ChangeNotifier {
   double get totalEarningsToday => _totalEarningsToday;
   int get completedSessionsToday => _completedSessionsToday;
 
-  SessionProvider();
+  SessionProvider() {
+    _initSignalRListeners();
+  }
+
+  void _initSignalRListeners() {
+    // 1. Real-time incoming chat message push (Zero polling!)
+    _signalRSubs.add(_signalR.messageReceivedStream.listen((msg) {
+      _handleIncomingRealtimeMessage(msg);
+    }));
+
+    // 2. Real-time advisor acceptance push
+    _signalRSubs.add(_signalR.advisorJoinedStream.listen((data) {
+      _handleAdvisorJoined(data);
+    }));
+
+    _signalRSubs.add(_signalR.advisorConnectedStream.listen((data) {
+      if (_sessionState == SessionState.waitingForAdvisor) {
+        _handleAdvisorJoined(data);
+      }
+    }));
+
+    // 3. Real-time incoming chat request for advisor
+    _signalRSubs.add(_signalR.incomingRequestStream.listen((req) {
+      _handleIncomingChatRequest(req);
+    }));
+
+    // 4. Real-time cancellation / decline / timeout
+    _signalRSubs.add(_signalR.chatCancelledStream.listen((payload) {
+      _handleRemoteChatCancelled(payload);
+    }));
+
+    // 5. Real-time session end
+    _signalRSubs.add(_signalR.chatEndedStream.listen((payload) {
+      _handleRemoteChatEnded(payload);
+    }));
+
+    // 6. Real-time hold / resume
+    _signalRSubs.add(_signalR.chatHoldStream.listen((payload) {
+      _sessionState = SessionState.hold;
+      notifyListeners();
+    }));
+
+    _signalRSubs.add(_signalR.chatResumeStream.listen((payload) {
+      _sessionState = SessionState.active;
+      notifyListeners();
+    }));
+  }
 
   @override
   void dispose() {
     _stopAllTimers();
-    _advisorIncomingRequestsTimer?.cancel();
+    for (var sub in _signalRSubs) {
+      sub.cancel();
+    }
+    _signalRSubs.clear();
     super.dispose();
   }
 
@@ -174,7 +225,7 @@ class SessionProvider extends ChangeNotifier {
   void toggleAdvisorOnline() {
     _isAdvisorOnline = !_isAdvisorOnline;
     if (!_isAdvisorOnline) {
-      stopAdvisorPolling();
+      _incomingRequests.clear();
     }
     notifyListeners();
   }
@@ -229,6 +280,8 @@ class SessionProvider extends ChangeNotifier {
     _chatSummary = null;
     _declineTitle = "Chat Declined";
     _declineMessage = "The advisor is currently unavailable to accept your chat request.";
+    _currentUserId = clientId;
+    _currentUserName = clientName;
 
     _sessionState = SessionState.waitingForAdvisor;
     _waitingSecondsLeft = 60;
@@ -285,8 +338,37 @@ class SessionProvider extends ChangeNotifier {
     // 60-second waiting countdown (parity with Angular 60s rule)
     _startWaitingCountdown(realRequestId);
 
-    // Poll for advisor acceptance every 2s
-    _startPollingAdvisorAcceptance(realRequestId);
+    // Join SignalR Chat Session group for instant real-time events (Zero polling!)
+    try {
+      await _signalR.ensureConnected(
+        userName: clientName,
+        userId: clientId,
+        isAdvisor: false,
+        requestId: realRequestId,
+      );
+      await _signalR.connectToChat(clientName, realRequestId);
+    } catch (e) {
+      debugPrint("SignalR Connect error: $e");
+    }
+
+    // Safety fallback: Check once after 6 seconds in case advisor accepted before websocket joined
+    Future.delayed(const Duration(seconds: 6), () {
+      if (_sessionState == SessionState.waitingForAdvisor) {
+        _checkSessionStatusOnce(realRequestId);
+      }
+    });
+  }
+
+  void _checkSessionStatusOnce(String requestId) async {
+    try {
+      final details = await _chatService.getSessionDetails(requestId);
+      if (details != null && _sessionState == SessionState.waitingForAdvisor) {
+        final bool chatAccepted = details['chatAccepted'] == true || details['ChatAccepted'] == true;
+        if (chatAccepted) {
+          _handleAdvisorJoined({'name': _activeRequest?.advisorName ?? 'Advisor'});
+        }
+      }
+    } catch (_) {}
   }
 
   void startDemoSession({
@@ -328,73 +410,149 @@ class SessionProvider extends ChangeNotifier {
     });
   }
 
-  void _startPollingAdvisorAcceptance(String requestId) {
-    _pollAcceptanceTimer?.cancel();
-    _pollAcceptanceTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      if (_sessionState != SessionState.waitingForAdvisor) {
-        timer.cancel();
-        return;
+  // ==========================================================
+  // REAL-TIME SIGNALR EVENT HANDLERS (ZERO POLLING)
+  // ==========================================================
+  void _handleAdvisorJoined(Map<String, dynamic> data) async {
+    if (_sessionState == SessionState.waitingForAdvisor) {
+      _waitingTimer?.cancel();
+      _waitingTimer = null;
+      _activeRequest?.isAccepted = true;
+      _sessionState = SessionState.active;
+      _startBillingTimer();
+
+      // One-time load of initial chat history upon entering
+      final reqId = _activeRequest?.id;
+      if (reqId != null) {
+        await _loadInitialChatHistory(reqId);
       }
 
-      // 1. Check SessionDetails from backend API
-      final details = await _chatService.getSessionDetails(requestId);
-      if (details != null) {
-        final bool chatAccepted = details['chatAccepted'] == true || details['ChatAccepted'] == true;
-        final int? status = details['status'] is int
-            ? details['status']
-            : (details['Status'] is int ? details['Status'] : null);
+      notifyListeners();
+    }
+  }
 
-        if (status == 2 || status == 3 || details['isTimeout'] == true || details['IsTimeout'] == true) {
-          timer.cancel();
-          _waitingTimer?.cancel();
-          _sessionState = SessionState.declined;
-          _declineTitle = "Chat Declined";
-          _declineMessage = "The advisor is currently unavailable to accept your chat request.";
-          notifyListeners();
-          return;
-        }
+  void _handleIncomingChatRequest(IncomingChatRequestRealtime req) {
+    if (!_isAdvisorOnline) return;
 
-        if (chatAccepted) {
-          timer.cancel();
-          _waitingTimer?.cancel();
-          _activeRequest?.isAccepted = true;
-          _sessionState = SessionState.active;
-          _startBillingTimer();
-          _startChatMessagesPolling(requestId);
-          notifyListeners();
-          return;
-        }
-      }
+    // Avoid duplicate requests
+    if (_incomingRequests.any((r) => r.id == req.requestId)) return;
 
-      // 2. Also check chat history for messages / decline
+    final item = SessionRequestItem(
+      id: req.requestId,
+      clientId: req.clientId,
+      clientName: req.clientName ?? 'Valued Client',
+      advisorId: req.advisorId,
+      advisorName: 'Advisor',
+      type: req.requestType == 2
+          ? SessionType.video
+          : (req.requestType == 3 ? SessionType.call : SessionType.chat),
+      ratePerMinute: 3.99,
+      createdAt: req.requestedAtUtc,
+    );
+
+    _incomingRequests.add(item);
+    notifyListeners();
+  }
+
+  void _handleIncomingRealtimeMessage(RealtimeChatMessage msg) {
+    if (msg.message.isEmpty || msg.message.startsWith('__TAROT_REQ__')) return;
+
+    // Check if this message was sent by ourselves to avoid echo duplicate
+    final isFromSelf = msg.userName == _currentUserName ||
+        msg.userName == _currentUserId ||
+        (msg.connectionId != null && msg.connectionId == _signalR.connectionId);
+
+    if (isFromSelf) return;
+
+    final bool isAdvisorMsg = msg.userName.toLowerCase() == 'advisor' ||
+        msg.userName == _activeRequest?.advisorName ||
+        msg.userName == _activeRequest?.advisorId;
+
+    // Avoid duplicate if already received
+    final exists = _chatMessages.any((m) =>
+        m.message == msg.message &&
+        m.timestamp.difference(msg.sentOn).inSeconds.abs() < 5);
+
+    if (!exists) {
+      _chatMessages.add(ChatMessageItem(
+        id: "sig_${DateTime.now().millisecondsSinceEpoch}",
+        senderId: msg.userName,
+        senderName: isAdvisorMsg
+            ? (_activeRequest?.advisorName ?? "Advisor")
+            : (_activeRequest?.clientName ?? "Client"),
+        message: msg.message,
+        timestamp: msg.sentOn,
+        isAdvisor: isAdvisorMsg,
+        isOpponent: true,
+        messageType: msg.messageType,
+      ));
+      notifyListeners();
+    }
+  }
+
+  void _handleRemoteChatCancelled(dynamic payload) {
+    final reqId = payload is Map ? payload['requestId']?.toString() : payload?.toString();
+    if (reqId != null) {
+      _incomingRequests.removeWhere((r) => r.id == reqId);
+    }
+    if (_sessionState == SessionState.waitingForAdvisor ||
+        (_activeRequest != null && (reqId == null || _activeRequest!.id == reqId))) {
+      _waitingTimer?.cancel();
+      _waitingTimer = null;
+      _sessionState = SessionState.declined;
+      _declineTitle = "Chat Cancelled";
+      _declineMessage = "The session was cancelled or timed out.";
+      notifyListeners();
+    }
+  }
+
+  void _handleRemoteChatEnded(dynamic payload) {
+    if (_sessionState == SessionState.active || _sessionState == SessionState.hold) {
+      _stopAllTimers();
+      _sessionState = SessionState.ended;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadInitialChatHistory(String requestId) async {
+    try {
       final history = await _chatService.getChatHistory(requestId);
       if (history.isNotEmpty) {
-        final hasDeclined = history.any((m) =>
-            m['messageType'] == 4 ||
-            m['MessageType'] == 4 ||
-            m['message'] == 'DECLINED' ||
-            m['message'] == 'CANCELLED');
+        for (var h in history) {
+          final text = h['message']?.toString() ?? '';
+          if (text.isEmpty || text.startsWith('__TAROT_REQ__')) continue;
+          final sentOnStr = h['sentOn']?.toString() ?? h['SentOn']?.toString();
+          DateTime time = DateTime.now();
+          if (sentOnStr != null) {
+            time = DateTime.tryParse(sentOnStr) ?? DateTime.now();
+          }
+          final fromUser = h['fromUser']?.toString() ?? h['FromUser']?.toString() ?? '';
+          final bool isAdvisorMsg = fromUser.toLowerCase() == 'advisor' ||
+              fromUser == _activeRequest?.advisorId ||
+              fromUser == _activeRequest?.advisorName;
 
-        if (hasDeclined) {
-          timer.cancel();
-          _waitingTimer?.cancel();
-          _sessionState = SessionState.declined;
-          _declineTitle = "Chat Declined";
-          _declineMessage = "The advisor declined the chat request.";
-          notifyListeners();
-          return;
+          final exists = _chatMessages.any((m) =>
+              m.message == text &&
+              (m.timestamp.difference(time).inSeconds.abs() < 5 || m.senderId == fromUser));
+
+          if (!exists) {
+            _chatMessages.add(ChatMessageItem(
+              id: "srv_${h['id'] ?? DateTime.now().millisecondsSinceEpoch}",
+              senderId: fromUser,
+              senderName: isAdvisorMsg
+                  ? (_activeRequest?.advisorName ?? "Advisor")
+                  : (_activeRequest?.clientName ?? "Client"),
+              message: text,
+              timestamp: time,
+              isAdvisor: isAdvisorMsg,
+              isOpponent: fromUser != _currentUserId && fromUser != _currentUserName,
+              messageType: (h['messageType'] is int) ? h['messageType'] : 1,
+            ));
+          }
         }
-
-        // If history contains messages, advisor has accepted
-        timer.cancel();
-        _waitingTimer?.cancel();
-        _activeRequest?.isAccepted = true;
-        _sessionState = SessionState.active;
-        _startBillingTimer();
-        _startChatMessagesPolling(requestId);
         notifyListeners();
       }
-    });
+    } catch (_) {}
   }
 
   // ==========================================================
@@ -495,7 +653,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   // ==========================================================
-  // REAL-TIME CHAT MESSAGING
+  // REAL-TIME CHAT MESSAGING (SIGNALR INSTANT PUSH)
   // ==========================================================
   Future<void> sendChatMessage({
     required String senderId,
@@ -504,6 +662,9 @@ class SessionProvider extends ChangeNotifier {
     required bool isAdvisor,
     int messageType = 1,
   }) async {
+    _currentUserId = senderId;
+    _currentUserName = senderName;
+
     final newMsg = ChatMessageItem(
       id: "msg_${DateTime.now().millisecondsSinceEpoch}",
       senderId: senderId,
@@ -520,6 +681,19 @@ class SessionProvider extends ChangeNotifier {
 
     final reqId = _activeRequest?.id;
     if (reqId != null && !reqId.startsWith("req_")) {
+      // 1. Instant push to opponent over SignalR Hub (Zero polling latency!)
+      try {
+        await _signalR.sendChatMessage(
+          message: message,
+          requestId: reqId,
+          fromUser: senderName,
+          messageType: messageType,
+        );
+      } catch (e) {
+        debugPrint("SignalR sendChatMessage error: $e");
+      }
+
+      // 2. Persist in backend DB
       await _chatService.sendChatMessage(
         requestId: reqId,
         message: message,
@@ -529,83 +703,23 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  void _startChatMessagesPolling(String requestId) {
-    _chatMessagePollTimer?.cancel();
-    _chatMessagePollTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      if (_sessionState != SessionState.active && _sessionState != SessionState.hold) {
-        timer.cancel();
-        return;
-      }
-
-      final history = await _chatService.getChatHistory(requestId);
-      if (history.isNotEmpty) {
-        // Detect if ended or cancelled remotely
-        final isDead = history.any((m) =>
-            m['messageType'] == 4 ||
-            m['MessageType'] == 4 ||
-            m['message'] == 'CANCELLED' ||
-            m['message'] == 'DECLINED' ||
-            m['message'] == 'Ended' ||
-            m['message'] == 'ChatEnded');
-
-        if (isDead) {
-          timer.cancel();
-          _stopAllTimers();
-          _sessionState = SessionState.ended;
-          notifyListeners();
-          return;
-        }
-
-        // Merge incoming messages
-        bool hasNew = false;
-        for (var h in history) {
-          final text = h['message']?.toString() ?? '';
-          if (text.isEmpty || text.startsWith('__TAROT_REQ__')) continue;
-          final sentOnStr = h['sentOn']?.toString() ?? h['SentOn']?.toString();
-          DateTime time = DateTime.now();
-          if (sentOnStr != null) {
-            time = DateTime.tryParse(sentOnStr) ?? DateTime.now();
-          }
-          final fromUser = h['fromUser']?.toString() ?? h['FromUser']?.toString() ?? '';
-          final bool isAdvisorMsg = fromUser.toLowerCase() == 'advisor' ||
-              fromUser == _activeRequest?.advisorId ||
-              fromUser == _activeRequest?.advisorName;
-
-          final exists = _chatMessages.any((m) =>
-              m.message == text &&
-              (m.timestamp.difference(time).inSeconds.abs() < 5 || m.senderId == fromUser));
-
-          if (!exists) {
-            _chatMessages.add(ChatMessageItem(
-              id: "srv_${h['id'] ?? DateTime.now().millisecondsSinceEpoch}",
-              senderId: fromUser,
-              senderName: isAdvisorMsg
-                  ? (_activeRequest?.advisorName ?? "Advisor")
-                  : (_activeRequest?.clientName ?? "Client"),
-              message: text,
-              timestamp: time,
-              isAdvisor: isAdvisorMsg,
-              isOpponent: true,
-              messageType: (h['messageType'] is int) ? h['messageType'] : 1,
-            ));
-            hasNew = true;
-          }
-        }
-
-        if (hasNew) {
-          notifyListeners();
-        }
-      }
-    });
-  }
-
   // ==========================================================
-  // ADVISOR INCOMING REQUEST POLLING & ACTIONS
+  // ADVISOR PRESENCE & ACTIONS (SIGNALR REAL-TIME PUSH)
   // ==========================================================
-  void startAdvisorPolling(String advisorProfileId) {
-    _advisorIncomingRequestsTimer?.cancel();
-    _advisorIncomingRequestsTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
-      if (!_isAdvisorOnline) return;
+  Future<void> startAdvisorPolling(String advisorProfileId, {String advisorName = 'Advisor', String userId = ''}) async {
+    _currentUserId = userId.isNotEmpty ? userId : advisorProfileId;
+    _currentUserName = advisorName;
+
+    // Connect to SignalR as Advisor (Zero polling!)
+    try {
+      await _signalR.ensureConnected(
+        userName: advisorName,
+        userId: _currentUserId,
+        advisorProfileId: advisorProfileId,
+        isAdvisor: true,
+      );
+
+      // Single initial fetch of any existing pending requests
       final requests = await _chatService.getChatRequests(advisorProfileId);
       if (requests.isNotEmpty) {
         final List<SessionRequestItem> mapped = [];
@@ -623,7 +737,7 @@ class SessionProvider extends ChangeNotifier {
             clientId: clientId,
             clientName: clientName,
             advisorId: advisorProfileId,
-            advisorName: 'Advisor',
+            advisorName: advisorName,
             type: reqTypeInt == 2 ? SessionType.video : (reqTypeInt == 3 ? SessionType.call : SessionType.chat),
             ratePerMinute: rate,
             createdAt: DateTime.now(),
@@ -634,28 +748,35 @@ class SessionProvider extends ChangeNotifier {
           _incomingRequests = mapped;
           notifyListeners();
         }
-      } else {
-        if (_incomingRequests.isNotEmpty) {
-          _incomingRequests.clear();
-          notifyListeners();
-        }
       }
-    });
+    } catch (e) {
+      debugPrint("startAdvisorPolling SignalR error: $e");
+    }
   }
 
   void stopAdvisorPolling() {
-    _advisorIncomingRequestsTimer?.cancel();
-    _advisorIncomingRequestsTimer = null;
+    // Zero polling timers to cancel; incoming requests arrive via SignalR push
   }
 
   Future<bool> acceptSessionRequest(SessionRequestItem req) async {
-    final success = await _chatService.acceptChat(req.id);
+    final connId = _signalR.connectionId.isNotEmpty ? _signalR.connectionId : 'mobile';
+    final success = await _chatService.acceptChat(req.id, connectId: connId);
     req.isAccepted = true;
     _activeRequest = req;
     _incomingRequests.clear();
     _sessionState = SessionState.active;
     _startBillingTimer();
-    _startChatMessagesPolling(req.id);
+
+    // Connect advisor to SignalR chat session group
+    try {
+      await _signalR.connectAdvisorToChat(req.advisorName, req.clientId, req.id);
+    } catch (e) {
+      debugPrint("connectAdvisorToChat error: $e");
+    }
+
+    // Load initial chat history
+    await _loadInitialChatHistory(req.id);
+
     notifyListeners();
     return success;
   }
@@ -693,7 +814,9 @@ class SessionProvider extends ChangeNotifier {
     }
 
     if (reqId != null && !reqId.startsWith("req_")) {
-      await _chatService.endChatSession(reqId, totalSecs);
+      // Notify over SignalR and settle billing
+      _signalR.endChat(reqId, totalSecs);
+      await _chatService.endChatSession(reqId, totalSecs, connectionId: _signalR.connectionId);
       _chatSummary = await _chatService.getSessionSummary(reqId);
     }
 
@@ -722,9 +845,5 @@ class SessionProvider extends ChangeNotifier {
     _sessionTimer = null;
     _waitingTimer?.cancel();
     _waitingTimer = null;
-    _pollAcceptanceTimer?.cancel();
-    _pollAcceptanceTimer = null;
-    _chatMessagePollTimer?.cancel();
-    _chatMessagePollTimer = null;
   }
 }
