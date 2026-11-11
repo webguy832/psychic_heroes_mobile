@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/utils/storage_service.dart';
 import '../../models/advisor_model.dart';
 import '../../models/category_model.dart';
 import '../../providers/auth_provider.dart';
@@ -171,7 +173,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
 
   /// Handles clicking Chat, Call, Video, or Text Reading
   /// Follows exact web angular logic:
-  /// 1. Check if user is logged in
+  /// 1. Check if user is logged in & token has not expired
   /// 2. Check if user is advisor (restricted)
   /// 3. Check if advisor is offline
   /// 4. Check session eligibility and balance via API (checkSessionEligibilty)
@@ -185,8 +187,13 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
       return;
     }
 
-    // 2. Authentication check (Matching Angular auth.isLoggedIn)
-    if (!auth.isLoggedIn) {
+    // 2. Authentication & Token Expiration Check (Matching Angular auth.isLoggedIn + token.exp)
+    final token = await StorageService.getToken();
+    if (!auth.isLoggedIn || token == null || token.isEmpty) {
+      if (auth.isLoggedIn) {
+        await auth.logout();
+        userProv.clearUser();
+      }
       _showSignInDialog(mode);
       return;
     }
@@ -229,6 +236,16 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+
+      if (e is ApiUnauthorizedException ||
+          (e is ApiException && e.statusCode == 401) ||
+          e.toString().contains('401') ||
+          e.toString().toLowerCase().contains('unauthorized')) {
+        await auth.logout();
+        userProv.clearUser();
+        _showSignInDialog(mode, isSessionExpired: true);
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error checking session eligibility: ${e.toString()}")),
@@ -290,13 +307,26 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
     );
   }
 
-  void _showSignInDialog(String mode) {
+  void _showSignInDialog(String mode, {bool isSessionExpired = false}) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Sign In Required"),
-        content: Text("Please sign in or create an account to start a $mode session with ${_advisor?.name ?? 'this advisor'}."),
+        title: Row(
+          children: [
+            Icon(
+              isSessionExpired ? Icons.lock_clock_outlined : Icons.lock_outline_rounded,
+              color: isSessionExpired ? Colors.orange : AppColors.accentGold,
+            ),
+            const SizedBox(width: 8),
+            Text(isSessionExpired ? "Session Expired" : "Sign In Required"),
+          ],
+        ),
+        content: Text(
+          isSessionExpired
+              ? "Your session has expired. Please sign in again to connect with ${_advisor?.name ?? 'this advisor'}."
+              : "Please sign in or create an account to start a $mode session with ${_advisor?.name ?? 'this advisor'}.",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),

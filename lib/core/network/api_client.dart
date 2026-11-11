@@ -5,6 +5,9 @@ import '../utils/storage_service.dart';
 import 'api_exception.dart';
 
 class ApiClient {
+  /// Callback triggered whenever an unauthorized 401 or expired session occurs
+  static void Function()? onUnauthorized;
+
   static Future<Map<String, String>> _getHeaders({bool requiresAuth = true}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -13,9 +16,11 @@ class ApiClient {
 
     if (requiresAuth) {
       final token = await StorageService.getToken();
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
+      if (token == null || token.isEmpty) {
+        onUnauthorized?.call();
+        throw ApiUnauthorizedException("Authentication required or session has expired.");
       }
+      headers['Authorization'] = 'Bearer $token';
     }
     return headers;
   }
@@ -39,7 +44,7 @@ class ApiClient {
       final uri = _buildUri(endpoint, queryParams);
       final headers = await _getHeaders(requiresAuth: requiresAuth);
       final response = await http.get(uri, headers: headers);
-      return _processResponse(response);
+      return await _processResponse(response);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException("Network connection error: ${e.toString()}");
@@ -55,7 +60,7 @@ class ApiClient {
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
       );
-      return _processResponse(response);
+      return await _processResponse(response);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException("Network connection error: ${e.toString()}");
@@ -71,7 +76,7 @@ class ApiClient {
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
       );
-      return _processResponse(response);
+      return await _processResponse(response);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException("Network connection error: ${e.toString()}");
@@ -83,14 +88,14 @@ class ApiClient {
       final uri = _buildUri(endpoint);
       final headers = await _getHeaders(requiresAuth: requiresAuth);
       final response = await http.delete(uri, headers: headers);
-      return _processResponse(response);
+      return await _processResponse(response);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException("Network connection error: ${e.toString()}");
     }
   }
 
-  static dynamic _processResponse(http.Response response) {
+  static Future<dynamic> _processResponse(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
       try {
@@ -98,6 +103,23 @@ class ApiClient {
       } catch (e) {
         throw ApiException("Failed to parse server response: ${e.toString()}", statusCode: response.statusCode);
       }
+    } else if (response.statusCode == 401) {
+      // Auto-clear session and notify app (matching Angular shared.interceptor)
+      await StorageService.clearSession();
+      onUnauthorized?.call();
+
+      String errorMessage = "Your session has expired. Please sign in again.";
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded.containsKey('message') && decoded['message'] != null) {
+          errorMessage = decoded['message'].toString();
+        } else if (decoded is Map && decoded.containsKey('error') && decoded['error'] != null) {
+          errorMessage = decoded['error'].toString();
+        } else if (decoded is Map && decoded.containsKey('title') && decoded['title'] != null) {
+          errorMessage = decoded['title'].toString();
+        }
+      } catch (_) {}
+      throw ApiUnauthorizedException(errorMessage, 401);
     } else {
       String errorMessage = "Request failed with status code ${response.statusCode}";
       try {

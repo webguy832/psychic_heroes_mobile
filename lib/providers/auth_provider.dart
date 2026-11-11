@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/network/api_client.dart';
 import '../core/utils/storage_service.dart';
 import '../models/auth_model.dart';
 import '../services/auth_service.dart';
@@ -16,6 +17,12 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider() {
     _checkInitialAuthStatus();
+    ApiClient.onUnauthorized = () {
+      if (_isLoggedIn) {
+        _isLoggedIn = false;
+        notifyListeners();
+      }
+    };
   }
 
   Future<void> _checkInitialAuthStatus() async {

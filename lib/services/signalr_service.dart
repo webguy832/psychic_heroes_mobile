@@ -542,3 +542,4 @@ class SignalRService {
     _advisorStatusController.close();
   }
 }
+

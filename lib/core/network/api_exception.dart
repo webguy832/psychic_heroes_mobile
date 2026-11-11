@@ -7,3 +7,8 @@ class ApiException implements Exception {
   @override
   String toString() => message;
 }
+
+class ApiUnauthorizedException extends ApiException {
+  ApiUnauthorizedException([String message = "Your session has expired. Please sign in again.", int? statusCode = 401])
+      : super(message, statusCode: statusCode ?? 401);
+}
