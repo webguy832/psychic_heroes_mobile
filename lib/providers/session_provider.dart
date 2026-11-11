@@ -430,7 +430,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   // ==========================================================
-  // REAL-TIME SIGNALR EVENT HANDLERS (ZERO POLLING)
+  // REAL-TIME SIGNALR EVENT HANDLERS & MESSAGE DELIVERY
   // ==========================================================
   void _handleAdvisorJoined(Map<String, dynamic> data) async {
     if (_sessionState == SessionState.waitingForAdvisor) {
@@ -443,7 +443,7 @@ class SessionProvider extends ChangeNotifier {
       // One-time load of initial chat history upon entering
       final reqId = _activeRequest?.id;
       if (reqId != null) {
-        await _loadInitialChatHistory(reqId);
+        await _syncChatHistory(reqId);
       }
 
       notifyListeners();
@@ -476,32 +476,61 @@ class SessionProvider extends ChangeNotifier {
   void _handleIncomingRealtimeMessage(RealtimeChatMessage msg) {
     if (msg.message.isEmpty || msg.message.startsWith('__TAROT_REQ__')) return;
 
-    // Check if this message was sent by ourselves to avoid echo duplicate
-    final isFromSelf = msg.userName == _currentUserName ||
-        msg.userName == _currentUserId ||
-        (msg.connectionId != null && msg.connectionId == _signalR.connectionId);
+    final cleanSender = msg.userName.trim().toLowerCase();
 
-    if (isFromSelf) return;
+    // Check if this incoming message was sent by ourselves
+    // (SignalR broadcasts SendMessageToUser to all connections in the session, including sender)
+    bool isFromSelf = false;
+    if (_isCurrentUserAdvisor) {
+      isFromSelf = cleanSender == 'advisor' ||
+          cleanSender == (_activeRequest?.advisorName.trim().toLowerCase() ?? '') ||
+          cleanSender == _currentUserName.trim().toLowerCase();
+    } else {
+      isFromSelf = cleanSender == 'client' ||
+          cleanSender == 'customer' ||
+          cleanSender == (_activeRequest?.clientName.trim().toLowerCase() ?? '') ||
+          cleanSender == _currentUserName.trim().toLowerCase() ||
+          cleanSender == _currentUserId.trim().toLowerCase();
+    }
 
-    final bool isAdvisorMsg = msg.userName.toLowerCase() == 'advisor' ||
-        msg.userName == _activeRequest?.advisorName ||
-        msg.userName == _activeRequest?.advisorId;
+    if (isFromSelf) {
+      // It's an echo of our own message. If not already in local list, add as non-opponent
+      final exists = _chatMessages.any((m) =>
+          !m.isOpponent &&
+          m.message == msg.message &&
+          m.timestamp.difference(msg.sentOn).inSeconds.abs() < 10);
+      if (!exists) {
+        _chatMessages.add(ChatMessageItem(
+          id: "sig_self_${DateTime.now().millisecondsSinceEpoch}",
+          senderId: _currentUserId,
+          senderName: _currentUserName,
+          message: msg.message,
+          timestamp: msg.sentOn,
+          isAdvisor: _isCurrentUserAdvisor,
+          isOpponent: false,
+          messageType: msg.messageType,
+        ));
+        notifyListeners();
+      }
+      return;
+    }
 
-    // Avoid duplicate if already received
+    // It is an OPPONENT message!
     final exists = _chatMessages.any((m) =>
+        m.isOpponent &&
         m.message == msg.message &&
-        m.timestamp.difference(msg.sentOn).inSeconds.abs() < 5);
+        m.timestamp.difference(msg.sentOn).inSeconds.abs() < 10);
 
     if (!exists) {
       _chatMessages.add(ChatMessageItem(
-        id: "sig_${DateTime.now().millisecondsSinceEpoch}",
+        id: "sig_opp_${DateTime.now().millisecondsSinceEpoch}",
         senderId: msg.userName,
-        senderName: isAdvisorMsg
-            ? (_activeRequest?.advisorName ?? "Advisor")
-            : (_activeRequest?.clientName ?? "Client"),
+        senderName: _isCurrentUserAdvisor
+            ? (_activeRequest?.clientName ?? "Client")
+            : (_activeRequest?.advisorName ?? "Advisor"),
         message: msg.message,
         timestamp: msg.sentOn,
-        isAdvisor: isAdvisorMsg,
+        isAdvisor: !_isCurrentUserAdvisor,
         isOpponent: true,
         messageType: msg.messageType,
       ));
@@ -539,46 +568,74 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadInitialChatHistory(String requestId) async {
+  Future<void> _syncChatHistory(String requestId) async {
     try {
       final history = await _chatService.getChatHistory(requestId);
-      if (history.isNotEmpty) {
-        for (var h in history) {
-          final text = h['message']?.toString() ?? '';
-          if (text.isEmpty || text.startsWith('__TAROT_REQ__')) continue;
-          final sentOnStr = h['sentOn']?.toString() ?? h['SentOn']?.toString();
-          DateTime time = DateTime.now();
-          if (sentOnStr != null) {
-            time = DateTime.tryParse(sentOnStr) ?? DateTime.now();
-          }
-          final fromUser = h['fromUser']?.toString() ?? h['FromUser']?.toString() ?? '';
-          final bool isAdvisorMsg = fromUser.toLowerCase() == 'advisor' ||
-              fromUser == _activeRequest?.advisorId ||
-              fromUser == _activeRequest?.advisorName;
+      if (history.isEmpty) return;
 
-          final exists = _chatMessages.any((m) =>
-              m.message == text &&
-              (m.timestamp.difference(time).inSeconds.abs() < 5 || m.senderId == fromUser));
+      bool changed = false;
+      for (var h in history) {
+        final text = h['message']?.toString() ?? '';
+        if (text.isEmpty || text.startsWith('__TAROT_REQ__')) continue;
+        final sentOnStr = h['sentOn']?.toString() ?? h['SentOn']?.toString();
+        DateTime time = DateTime.now();
+        if (sentOnStr != null) {
+          time = DateTime.tryParse(sentOnStr) ?? DateTime.now();
+        }
 
-          if (!exists) {
-            _chatMessages.add(ChatMessageItem(
-              id: "srv_${h['id'] ?? DateTime.now().millisecondsSinceEpoch}",
-              senderId: fromUser,
-              senderName: isAdvisorMsg
-                  ? (_activeRequest?.advisorName ?? "Advisor")
-                  : (_activeRequest?.clientName ?? "Client"),
-              message: text,
-              timestamp: time,
-              isAdvisor: isAdvisorMsg,
-              isOpponent: fromUser != _currentUserId && fromUser != _currentUserName,
-              messageType: (h['messageType'] is int) ? h['messageType'] : 1,
-            ));
+        // Determine if message is from opponent
+        bool isOpponent;
+        if (h['isOpponent'] is bool) {
+          isOpponent = h['isOpponent'] as bool;
+        } else if (h['IsOpponent'] is bool) {
+          isOpponent = h['IsOpponent'] as bool;
+        } else {
+          final from = (h['fromUser']?.toString() ?? h['FromUser']?.toString() ?? '').toLowerCase().trim();
+          if (_isCurrentUserAdvisor) {
+            isOpponent = from != 'advisor' &&
+                from != _currentUserId.toLowerCase() &&
+                from != _currentUserName.toLowerCase() &&
+                from != (_activeRequest?.advisorName.toLowerCase() ?? '');
+          } else {
+            isOpponent = from == 'advisor' ||
+                from == (_activeRequest?.advisorName.toLowerCase() ?? '') ||
+                (from != _currentUserId.toLowerCase() && from != _currentUserName.toLowerCase());
           }
         }
+
+        final bool isAdvMsg = _isCurrentUserAdvisor ? !isOpponent : isOpponent;
+
+        final alreadyExists = _chatMessages.any((m) =>
+            m.message == text &&
+            m.isOpponent == isOpponent &&
+            m.timestamp.difference(time).inSeconds.abs() < 10);
+
+        if (!alreadyExists) {
+          _chatMessages.add(ChatMessageItem(
+            id: "srv_${h['messageId'] ?? h['id'] ?? DateTime.now().millisecondsSinceEpoch}",
+            senderId: isOpponent
+                ? (_isCurrentUserAdvisor ? (_activeRequest?.clientId ?? "client") : (_activeRequest?.advisorId ?? "advisor"))
+                : _currentUserId,
+            senderName: isOpponent
+                ? (_isCurrentUserAdvisor ? (_activeRequest?.clientName ?? "Client") : (_activeRequest?.advisorName ?? "Advisor"))
+                : _currentUserName,
+            message: text,
+            timestamp: time,
+            isAdvisor: isAdvMsg,
+            isOpponent: isOpponent,
+            messageType: (h['messageType'] is int) ? h['messageType'] : 1,
+          ));
+          changed = true;
+        }
+      }
+      if (changed) {
         notifyListeners();
       }
     } catch (_) {}
   }
+
+  // Backward compatibility alias
+  Future<void> _loadInitialChatHistory(String requestId) => _syncChatHistory(requestId);
 
   // ==========================================================
   // BILLING & TIMER LOGIC (45-SECOND RULE & FREE MINS PARITY)
@@ -591,6 +648,14 @@ class SessionProvider extends ChangeNotifier {
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_sessionState != SessionState.active) return;
       _elapsedSeconds++;
+
+      // Periodic 3s chat history sync safety net for both participants
+      if (_elapsedSeconds % 3 == 0) {
+        final reqId = _activeRequest?.id;
+        if (reqId != null && !reqId.startsWith("req_")) {
+          _syncChatHistory(reqId);
+        }
+      }
 
       // Parity with Angular advisor-chat.component.ts:
       // ADVISOR ONLY increments elapsed seconds. ADVISORS DO NOT DEDUCT WALLET BALANCE OR AUTO-HOLD!
@@ -696,6 +761,7 @@ class SessionProvider extends ChangeNotifier {
   }) async {
     _currentUserId = senderId;
     _currentUserName = senderName;
+    _isCurrentUserAdvisor = isAdvisor;
 
     final newMsg = ChatMessageItem(
       id: "msg_${DateTime.now().millisecondsSinceEpoch}",
@@ -726,12 +792,16 @@ class SessionProvider extends ChangeNotifier {
       }
 
       // 2. Persist in backend DB
-      await _chatService.sendChatMessage(
-        requestId: reqId,
-        message: message,
-        senderId: senderId,
-        messageType: messageType,
-      );
+      try {
+        await _chatService.sendChatMessage(
+          requestId: reqId,
+          message: message,
+          senderId: senderId,
+          messageType: messageType,
+        );
+      } catch (e) {
+        debugPrint("ChatService sendChatMessage error: $e");
+      }
     }
   }
 

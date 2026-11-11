@@ -460,7 +460,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                           itemCount: sessionProv.chatMessages.length,
                           itemBuilder: (context, index) {
                             final msg = sessionProv.chatMessages[index];
-                            final isMe = widget.isAdvisorView ? msg.isAdvisor : !msg.isAdvisor;
+                            final isMe = !msg.isOpponent;
 
                             return Align(
                               alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
