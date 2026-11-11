@@ -253,4 +253,38 @@ class ChatService {
       return null;
     }
   }
+
+  /// Updates client SignalR connection ID via api/Chat/UpdateClientConInfo (matching Angular parity)
+  Future<bool> updateClientConnectionInfo(String requestId, String connectionId) async {
+    try {
+      await ApiClient.post(
+        ApiEndpoints.updateClientConInfo,
+        body: {
+          'requestId': requestId,
+          'connectionId': connectionId,
+        },
+        requiresAuth: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Updates advisor SignalR connection ID via api/Chat/UpdateAdvisorConInfo (matching Angular parity)
+  Future<bool> updateAdvisorConnectionInfo(String requestId, String connectionId) async {
+    try {
+      await ApiClient.post(
+        ApiEndpoints.updateAdvisorConInfo,
+        body: {
+          'requestId': requestId,
+          'connectionId': connectionId,
+        },
+        requiresAuth: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

@@ -36,6 +36,8 @@ class ApiEndpoints {
   static const String paidSessionConfirmation = "api/PaidSessionConfirmation";
   static const String sessionSummary = "api/VoiceCall/summary";
   static const String sessionDetails = "api/Chat/SessionDetails";
+  static const String updateClientConInfo = "api/Chat/UpdateClientConInfo";
+  static const String updateAdvisorConInfo = "api/Chat/UpdateAdvisorConInfo";
 
   // User Endpoints
   static const String userProfile = "api/User/GetUserProfile";

@@ -325,22 +325,50 @@ class SignalRService {
         }
         break;
 
+      case 'customer.request.accepted':
       case 'advisorJoined':
-        if (args.length >= 2) {
-          _advisorJoinedController.add({
-            'connectionId': args[0]?.toString() ?? '',
-            'name': args[1]?.toString() ?? 'Advisor',
-          });
+        String connId = '';
+        String name = 'Advisor';
+        if (args.isNotEmpty) {
+          if (args[0] is Map) {
+            final m = args[0] as Map;
+            connId = m['advisorConnectionId']?.toString() ?? m['clientConnectionId']?.toString() ?? '';
+            name = m['advisorName']?.toString() ?? 'Advisor';
+          } else {
+            connId = args[0]?.toString() ?? '';
+            if (args.length >= 2) {
+              name = args[1]?.toString() ?? 'Advisor';
+            }
+          }
         }
+        _advisorJoinedController.add({
+          'connectionId': connId,
+          'name': name,
+          if (args.isNotEmpty && args[0] is Map) ...(args[0] as Map).cast<String, dynamic>(),
+        });
         break;
 
+      case 'advisor.request.accepted.confirm':
       case 'advisorConnected':
-        if (args.length >= 2) {
-          _advisorConnectedController.add({
-            'connectionId': args[0]?.toString() ?? '',
-            'name': args[1]?.toString() ?? 'Advisor',
-          });
+        String connId = '';
+        String name = 'Advisor';
+        if (args.isNotEmpty) {
+          if (args[0] is Map) {
+            final m = args[0] as Map;
+            connId = m['connectionId']?.toString() ?? '';
+            name = m['name']?.toString() ?? 'Advisor';
+          } else {
+            connId = args[0]?.toString() ?? '';
+            if (args.length >= 2) {
+              name = args[1]?.toString() ?? 'Advisor';
+            }
+          }
         }
+        _advisorConnectedController.add({
+          'connectionId': connId,
+          'name': name,
+          if (args.isNotEmpty && args[0] is Map) ...(args[0] as Map).cast<String, dynamic>(),
+        });
         break;
 
       case 'advisor.request.incoming':

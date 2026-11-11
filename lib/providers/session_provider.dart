@@ -106,11 +106,13 @@ class SessionProvider extends ChangeNotifier {
   double _totalEarningsToday = 1420.50;
   int _completedSessionsToday = 14;
 
-  // Current user identifiers for message attribution
+  // Current user identifiers for message attribution & role
   String _currentUserId = '';
   String _currentUserName = '';
+  bool _isCurrentUserAdvisor = false;
 
   // Getters
+  bool get isCurrentUserAdvisor => _isCurrentUserAdvisor;
   bool get isAdvisorOnline => _isAdvisorOnline;
   SessionState get sessionState => _sessionState;
   SessionType get sessionType => _sessionType;
@@ -282,6 +284,7 @@ class SessionProvider extends ChangeNotifier {
     _declineMessage = "The advisor is currently unavailable to accept your chat request.";
     _currentUserId = clientId;
     _currentUserName = clientName;
+    _isCurrentUserAdvisor = false;
 
     _sessionState = SessionState.waitingForAdvisor;
     _waitingSecondsLeft = 60;
@@ -338,7 +341,7 @@ class SessionProvider extends ChangeNotifier {
     // 60-second waiting countdown (parity with Angular 60s rule)
     _startWaitingCountdown(realRequestId);
 
-    // Join SignalR Chat Session group for instant real-time events (Zero polling!)
+    // Join SignalR Chat Session group for instant real-time events (matching Angular startConnection parity)
     try {
       await _signalR.ensureConnected(
         userName: clientName,
@@ -347,12 +350,17 @@ class SessionProvider extends ChangeNotifier {
         requestId: realRequestId,
       );
       await _signalR.connectToChat(clientName, realRequestId);
+
+      // Register client connection info with backend so backend pushes customer.request.accepted directly
+      if (_signalR.connectionId.isNotEmpty) {
+        await _chatService.updateClientConnectionInfo(realRequestId, _signalR.connectionId);
+      }
     } catch (e) {
-      debugPrint("SignalR Connect error: $e");
+      debugPrint("SignalR Connect / updateClientConnectionInfo error: $e");
     }
 
-    // Safety fallback: Check once after 6 seconds in case advisor accepted before websocket joined
-    Future.delayed(const Duration(seconds: 6), () {
+    // Safety fallback: Check status immediately after brief delay
+    Future.delayed(const Duration(seconds: 3), () {
       if (_sessionState == SessionState.waitingForAdvisor) {
         _checkSessionStatusOnce(realRequestId);
       }
@@ -363,7 +371,10 @@ class SessionProvider extends ChangeNotifier {
     try {
       final details = await _chatService.getSessionDetails(requestId);
       if (details != null && _sessionState == SessionState.waitingForAdvisor) {
-        final bool chatAccepted = details['chatAccepted'] == true || details['ChatAccepted'] == true;
+        final bool chatAccepted = details['chatAccepted'] == true ||
+            details['ChatAccepted'] == true ||
+            details['startOn'] != null ||
+            details['StartOn'] != null;
         if (chatAccepted) {
           _handleAdvisorJoined({'name': _activeRequest?.advisorName ?? 'Advisor'});
         }
@@ -394,6 +405,11 @@ class SessionProvider extends ChangeNotifier {
     _waitingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _waitingSecondsLeft--;
       notifyListeners();
+
+      // Check session status every 2 seconds as a fallback safety net for network hiccups
+      if (_waitingSecondsLeft % 2 == 0 && _sessionState == SessionState.waitingForAdvisor) {
+        _checkSessionStatusOnce(requestId);
+      }
 
       if (_waitingSecondsLeft <= 0) {
         _waitingTimer?.cancel();
@@ -491,12 +507,18 @@ class SessionProvider extends ChangeNotifier {
   }
 
   void _handleRemoteChatCancelled(dynamic payload) {
-    final reqId = payload is Map ? payload['requestId']?.toString() : payload?.toString();
-    if (reqId != null) {
+    final reqId = payload is Map
+        ? (payload['requestId']?.toString() ?? payload['RequestId']?.toString() ?? payload['id']?.toString())
+        : payload?.toString();
+    if (reqId != null && reqId.isNotEmpty) {
       _incomingRequests.removeWhere((r) => r.id == reqId);
     }
+    // If cancellation is specifically for a different request, do not cancel the active request
+    if (_activeRequest != null && reqId != null && reqId.isNotEmpty && _activeRequest!.id != reqId) {
+      return;
+    }
     if (_sessionState == SessionState.waitingForAdvisor ||
-        (_activeRequest != null && (reqId == null || _activeRequest!.id == reqId))) {
+        (_activeRequest != null && (reqId == null || reqId.isEmpty || _activeRequest!.id == reqId))) {
       _waitingTimer?.cancel();
       _waitingTimer = null;
       _sessionState = SessionState.declined;
@@ -566,6 +588,13 @@ class SessionProvider extends ChangeNotifier {
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_sessionState != SessionState.active) return;
       _elapsedSeconds++;
+
+      // Parity with Angular advisor-chat.component.ts:
+      // ADVISOR ONLY increments elapsed seconds. ADVISORS DO NOT DEDUCT WALLET BALANCE OR AUTO-HOLD!
+      if (_isCurrentUserAdvisor) {
+        notifyListeners();
+        return;
+      }
 
       final rate = _activeRequest?.ratePerMinute ?? 3.99;
       const deductAtSecond = 45;
@@ -759,6 +788,20 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<bool> acceptSessionRequest(SessionRequestItem req) async {
+    _isCurrentUserAdvisor = true;
+    _currentUserId = req.advisorId;
+    _currentUserName = req.advisorName;
+
+    // Ensure advisor SignalR connection is active with presence
+    try {
+      await _signalR.ensureConnected(
+        userName: req.advisorName,
+        userId: req.advisorId,
+        isAdvisor: true,
+        requestId: req.id,
+      );
+    } catch (_) {}
+
     final connId = _signalR.connectionId.isNotEmpty ? _signalR.connectionId : 'mobile';
     final success = await _chatService.acceptChat(req.id, connectId: connId);
     req.isAccepted = true;
@@ -767,11 +810,14 @@ class SessionProvider extends ChangeNotifier {
     _sessionState = SessionState.active;
     _startBillingTimer();
 
-    // Connect advisor to SignalR chat session group
+    // Connect advisor to SignalR chat session group & register advisor connection info (matching Angular parity)
     try {
-      await _signalR.connectAdvisorToChat(req.advisorName, req.clientId, req.id);
+      await _signalR.connectAdvisorToChat(req.advisorName, connId, req.id);
+      if (_signalR.connectionId.isNotEmpty) {
+        await _chatService.updateAdvisorConnectionInfo(req.id, _signalR.connectionId);
+      }
     } catch (e) {
-      debugPrint("connectAdvisorToChat error: $e");
+      debugPrint("connectAdvisorToChat / updateAdvisorConnectionInfo error: $e");
     }
 
     // Load initial chat history
