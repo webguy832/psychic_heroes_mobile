@@ -478,28 +478,22 @@ class SessionProvider extends ChangeNotifier {
 
     final cleanSender = msg.userName.trim().toLowerCase();
 
-    // Check if this incoming message was sent by ourselves
-    // (SignalR broadcasts SendMessageToUser to all connections in the session, including sender)
-    bool isFromSelf = false;
-    if (_isCurrentUserAdvisor) {
-      isFromSelf = cleanSender == 'advisor' ||
-          cleanSender == (_activeRequest?.advisorName.trim().toLowerCase() ?? '') ||
-          cleanSender == _currentUserName.trim().toLowerCase();
-    } else {
-      isFromSelf = cleanSender == 'client' ||
-          cleanSender == 'customer' ||
-          cleanSender == (_activeRequest?.clientName.trim().toLowerCase() ?? '') ||
-          cleanSender == _currentUserName.trim().toLowerCase() ||
-          cleanSender == _currentUserId.trim().toLowerCase();
-    }
+    // Check if sender is advisor
+    final bool isFromAdvisor = cleanSender == 'advisor' ||
+        cleanSender == (_activeRequest?.advisorName.trim().toLowerCase() ?? '') ||
+        cleanSender == (_activeRequest?.advisorId.trim().toLowerCase() ?? '');
 
-    if (isFromSelf) {
-      // It's an echo of our own message. If not already in local list, add as non-opponent
-      final exists = _chatMessages.any((m) =>
+    // Is it an opponent message for the current viewer?
+    final bool isOpponent = _isCurrentUserAdvisor ? !isFromAdvisor : isFromAdvisor;
+
+    if (!isOpponent) {
+      // Echo of our own message from server.
+      // If not already in local list, add it
+      final alreadyExists = _chatMessages.any((m) =>
           !m.isOpponent &&
-          m.message == msg.message &&
-          m.timestamp.difference(msg.sentOn).inSeconds.abs() < 10);
-      if (!exists) {
+          m.message.trim() == msg.message.trim() &&
+          m.timestamp.difference(msg.sentOn).inSeconds.abs() < 15);
+      if (!alreadyExists) {
         _chatMessages.add(ChatMessageItem(
           id: "sig_self_${DateTime.now().millisecondsSinceEpoch}",
           senderId: _currentUserId,
@@ -516,12 +510,12 @@ class SessionProvider extends ChangeNotifier {
     }
 
     // It is an OPPONENT message!
-    final exists = _chatMessages.any((m) =>
+    final alreadyExists = _chatMessages.any((m) =>
         m.isOpponent &&
-        m.message == msg.message &&
-        m.timestamp.difference(msg.sentOn).inSeconds.abs() < 10);
+        m.message.trim() == msg.message.trim() &&
+        m.timestamp.difference(msg.sentOn).inSeconds.abs() < 15);
 
-    if (!exists) {
+    if (!alreadyExists) {
       _chatMessages.add(ChatMessageItem(
         id: "sig_opp_${DateTime.now().millisecondsSinceEpoch}",
         senderId: msg.userName,
@@ -583,36 +577,34 @@ class SessionProvider extends ChangeNotifier {
           time = DateTime.tryParse(sentOnStr) ?? DateTime.now();
         }
 
-        // Determine if message is from opponent
-        bool isOpponent;
-        if (h['isOpponent'] is bool) {
-          isOpponent = h['isOpponent'] as bool;
-        } else if (h['IsOpponent'] is bool) {
-          isOpponent = h['IsOpponent'] as bool;
+        // Determine if message is from advisor using backend's IsOpponentAdvisor (or FromUser fallback)
+        bool isFromAdvisor = false;
+        if (h['isOpponentAdvisor'] is bool) {
+          isFromAdvisor = h['isOpponentAdvisor'] as bool;
+        } else if (h['IsOpponentAdvisor'] is bool) {
+          isFromAdvisor = h['IsOpponentAdvisor'] as bool;
         } else {
           final from = (h['fromUser']?.toString() ?? h['FromUser']?.toString() ?? '').toLowerCase().trim();
-          if (_isCurrentUserAdvisor) {
-            isOpponent = from != 'advisor' &&
-                from != _currentUserId.toLowerCase() &&
-                from != _currentUserName.toLowerCase() &&
-                from != (_activeRequest?.advisorName.toLowerCase() ?? '');
-          } else {
-            isOpponent = from == 'advisor' ||
-                from == (_activeRequest?.advisorName.toLowerCase() ?? '') ||
-                (from != _currentUserId.toLowerCase() && from != _currentUserName.toLowerCase());
-          }
+          isFromAdvisor = from == 'advisor' ||
+              from == (_activeRequest?.advisorName.toLowerCase().trim() ?? '') ||
+              from == (_activeRequest?.advisorId.toLowerCase().trim() ?? '');
         }
 
-        final bool isAdvMsg = _isCurrentUserAdvisor ? !isOpponent : isOpponent;
+        // Opponent status based on current viewer's role
+        final bool isOpponent = _isCurrentUserAdvisor ? !isFromAdvisor : isFromAdvisor;
 
-        final alreadyExists = _chatMessages.any((m) =>
-            m.message == text &&
-            m.isOpponent == isOpponent &&
-            m.timestamp.difference(time).inSeconds.abs() < 10);
+        final msgIdStr = h['messageId']?.toString() ?? h['MessageId']?.toString() ?? h['id']?.toString();
+
+        final alreadyExists = _chatMessages.any((m) {
+          if (msgIdStr != null && m.id == "srv_$msgIdStr") return true;
+          return m.message.trim() == text.trim() &&
+              m.isOpponent == isOpponent &&
+              m.timestamp.difference(time).inSeconds.abs() < 20;
+        });
 
         if (!alreadyExists) {
           _chatMessages.add(ChatMessageItem(
-            id: "srv_${h['messageId'] ?? h['id'] ?? DateTime.now().millisecondsSinceEpoch}",
+            id: msgIdStr != null ? "srv_$msgIdStr" : "srv_${DateTime.now().millisecondsSinceEpoch}",
             senderId: isOpponent
                 ? (_isCurrentUserAdvisor ? (_activeRequest?.clientId ?? "client") : (_activeRequest?.advisorId ?? "advisor"))
                 : _currentUserId,
@@ -621,7 +613,7 @@ class SessionProvider extends ChangeNotifier {
                 : _currentUserName,
             message: text,
             timestamp: time,
-            isAdvisor: isAdvMsg,
+            isAdvisor: isFromAdvisor,
             isOpponent: isOpponent,
             messageType: (h['messageType'] is int) ? h['messageType'] : 1,
           ));
@@ -629,6 +621,7 @@ class SessionProvider extends ChangeNotifier {
         }
       }
       if (changed) {
+        _chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         notifyListeners();
       }
     } catch (_) {}
@@ -917,6 +910,7 @@ class SessionProvider extends ChangeNotifier {
     _currentUserName = req.advisorName;
     _activeRequest = req;
     _incomingRequests.clear();
+    _chatMessages.clear();
     _sessionState = SessionState.active;
     notifyListeners();
 
