@@ -170,7 +170,12 @@ class SignalRService {
     if (_state == SignalRConnectionState.connected && _channel != null) {
       await _registerPresenceInternal();
       if (_savedRequestId.isNotEmpty) {
-        await connectToChat(_savedUserName, _savedRequestId);
+        if (!_savedIsAdvisor) {
+          await connectToChat(_savedUserName, _savedRequestId);
+        } else {
+          final connId = _connectionId.isNotEmpty ? _connectionId : 'mobile';
+          await connectAdvisorToChat(_savedUserName, connId, _savedRequestId);
+        }
       }
       return _connectionId;
     }
@@ -216,6 +221,9 @@ class SignalRService {
         throw Exception("SignalR negotiate returned no connectionToken");
       }
 
+      // Store Connection ID immediately from negotiate response
+      _connectionId = negJson['connectionId']?.toString() ?? connectionToken.toString();
+
       final baseUri = Uri.parse(ApiEndpoints.baseUrl);
       final wsScheme = baseUri.scheme == 'https' ? 'wss' : 'ws';
       final wsAuthority = baseUri.authority;
@@ -256,7 +264,12 @@ class SignalRService {
       await _registerPresenceInternal();
 
       if (_savedRequestId.isNotEmpty) {
-        await connectToChat(_savedUserName, _savedRequestId);
+        if (!_savedIsAdvisor) {
+          await connectToChat(_savedUserName, _savedRequestId);
+        } else {
+          final connId = _connectionId.isNotEmpty ? _connectionId : 'mobile';
+          await connectAdvisorToChat(_savedUserName, connId, _savedRequestId);
+        }
       }
 
       return _connectionId;
@@ -385,6 +398,9 @@ class SignalRService {
               name = args[1]?.toString() ?? 'Advisor';
             }
           }
+        }
+        if (connId.isNotEmpty) {
+          _connectionId = connId;
         }
         _advisorConnectedController.add({
           'connectionId': connId,

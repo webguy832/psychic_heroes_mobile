@@ -26,6 +26,31 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
   bool _handledSessionEnd = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initSessionChat();
+    });
+  }
+
+  void _initSessionChat() async {
+    if (!mounted) return;
+    final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+    final activeReq = sessionProv.activeRequest;
+    if (activeReq != null && !activeReq.id.startsWith("req_")) {
+      try {
+        if (widget.isAdvisorView) {
+          final connId = sessionProv.connectionId.isNotEmpty ? sessionProv.connectionId : 'mobile';
+          await sessionProv.signalR.connectAdvisorToChat(activeReq.advisorName, connId, activeReq.id);
+        } else {
+          await sessionProv.signalR.connectToChat(activeReq.clientName, activeReq.id);
+        }
+      } catch (_) {}
+      await sessionProv.syncChatHistory(activeReq.id);
+    }
+  }
+
+  @override
   void dispose() {
     _msgController.dispose();
     _scrollController.dispose();
@@ -378,7 +403,7 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "${msg.timestamp.hour}:${msg.timestamp.minute.toString().padLeft(2, '0')}",
+                          "${msg.timestamp.toLocal().hour}:${msg.timestamp.toLocal().minute.toString().padLeft(2, '0')}",
                           style: const TextStyle(fontSize: 9, color: AppColors.textPrimaryDark),
                         ),
                       ],

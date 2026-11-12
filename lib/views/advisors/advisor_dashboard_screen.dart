@@ -54,10 +54,9 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           builder: (dialogCtx) {
             return _IncomingRequestDialogModal(
               req: req,
-              onAccept: () {
+              onAccept: () async {
                 _isDialogShowing = false;
                 Navigator.of(dialogCtx).pop();
-                sessionProv.acceptSessionRequest(req);
                 Widget targetScreen = const LiveSessionScreen(isAdvisorView: true);
                 if (req.type == SessionType.video) {
                   targetScreen = const VideoCallScreen(isAdvisorView: true);
@@ -68,6 +67,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => targetScreen),
                 );
+                await sessionProv.acceptSessionRequest(req);
               },
               onDecline: (r) {
                 _isDialogShowing = false;

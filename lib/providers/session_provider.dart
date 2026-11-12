@@ -134,6 +134,8 @@ class SessionProvider extends ChangeNotifier {
   String get declineMessage => _declineMessage;
   Map<String, dynamic>? get chatSummary => _chatSummary;
   double get advisorBaseRate => _advisorBaseRate;
+  SignalRService get signalR => _signalR;
+  String get connectionId => _signalR.connectionId;
 
   bool get isMuted => _isMuted;
   bool get isSpeakerOn => _isSpeakerOn;
@@ -488,24 +490,27 @@ class SessionProvider extends ChangeNotifier {
     // Is it an opponent message for the current viewer?
     final bool isOpponent = _isCurrentUserAdvisor ? !isFromAdvisor : isFromAdvisor;
 
+    final localSentOn = msg.sentOn.toLocal();
+
     if (!isOpponent) {
       // Echo of our own message from server.
       // If not already in local list, add it
       final alreadyExists = _chatMessages.any((m) =>
           !m.isOpponent &&
           m.message.trim() == msg.message.trim() &&
-          m.timestamp.difference(msg.sentOn).inSeconds.abs() < 15);
+          m.timestamp.difference(localSentOn).inSeconds.abs() < 25);
       if (!alreadyExists) {
         _chatMessages.add(ChatMessageItem(
           id: "sig_self_${DateTime.now().millisecondsSinceEpoch}",
           senderId: _currentUserId,
           senderName: _currentUserName,
           message: msg.message,
-          timestamp: msg.sentOn,
+          timestamp: localSentOn,
           isAdvisor: _isCurrentUserAdvisor,
           isOpponent: false,
           messageType: msg.messageType,
         ));
+        _chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         notifyListeners();
       }
       return;
@@ -515,7 +520,7 @@ class SessionProvider extends ChangeNotifier {
     final alreadyExists = _chatMessages.any((m) =>
         m.isOpponent &&
         m.message.trim() == msg.message.trim() &&
-        m.timestamp.difference(msg.sentOn).inSeconds.abs() < 15);
+        m.timestamp.difference(localSentOn).inSeconds.abs() < 25);
 
     if (!alreadyExists) {
       _chatMessages.add(ChatMessageItem(
@@ -525,11 +530,12 @@ class SessionProvider extends ChangeNotifier {
             ? (_activeRequest?.clientName ?? "Client")
             : (_activeRequest?.advisorName ?? "Advisor"),
         message: msg.message,
-        timestamp: msg.sentOn,
+        timestamp: localSentOn,
         isAdvisor: !_isCurrentUserAdvisor,
         isOpponent: true,
         messageType: msg.messageType,
       ));
+      _chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       notifyListeners();
     }
   }
@@ -564,6 +570,14 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  /// Public method to trigger immediate chat history sync
+  Future<void> syncChatHistory([String? reqId]) async {
+    final effectiveId = reqId ?? _activeRequest?.id;
+    if (effectiveId != null && !effectiveId.startsWith("req_")) {
+      await _syncChatHistory(effectiveId);
+    }
+  }
+
   Future<void> _syncChatHistory(String requestId) async {
     try {
       final history = await _chatService.getChatHistory(requestId);
@@ -576,7 +590,7 @@ class SessionProvider extends ChangeNotifier {
         final sentOnStr = h['sentOn']?.toString() ?? h['SentOn']?.toString();
         DateTime time = DateTime.now();
         if (sentOnStr != null) {
-          time = DateTime.tryParse(sentOnStr) ?? DateTime.now();
+          time = (DateTime.tryParse(sentOnStr) ?? DateTime.now()).toLocal();
         }
 
         // Determine if message is from advisor using backend's IsOpponentAdvisor (or FromUser fallback)
@@ -597,14 +611,14 @@ class SessionProvider extends ChangeNotifier {
 
         final msgIdStr = h['messageId']?.toString() ?? h['MessageId']?.toString() ?? h['id']?.toString();
 
-        final alreadyExists = _chatMessages.any((m) {
+        final existingIndex = _chatMessages.indexWhere((m) {
           if (msgIdStr != null && m.id == "srv_$msgIdStr") return true;
           return m.message.trim() == text.trim() &&
               m.isOpponent == isOpponent &&
-              m.timestamp.difference(time).inSeconds.abs() < 20;
+              m.timestamp.difference(time).inSeconds.abs() < 30;
         });
 
-        if (!alreadyExists) {
+        if (existingIndex == -1) {
           _chatMessages.add(ChatMessageItem(
             id: msgIdStr != null ? "srv_$msgIdStr" : "srv_${DateTime.now().millisecondsSinceEpoch}",
             senderId: isOpponent
@@ -620,6 +634,18 @@ class SessionProvider extends ChangeNotifier {
             messageType: (h['messageType'] is int) ? h['messageType'] : 1,
           ));
           changed = true;
+        } else if (msgIdStr != null && _chatMessages[existingIndex].id != "srv_$msgIdStr") {
+          // Upgrade local temporary message ID to server ID
+          _chatMessages[existingIndex] = ChatMessageItem(
+            id: "srv_$msgIdStr",
+            senderId: _chatMessages[existingIndex].senderId,
+            senderName: _chatMessages[existingIndex].senderName,
+            message: _chatMessages[existingIndex].message,
+            timestamp: time,
+            isAdvisor: _chatMessages[existingIndex].isAdvisor,
+            isOpponent: _chatMessages[existingIndex].isOpponent,
+            messageType: _chatMessages[existingIndex].messageType,
+          );
         }
       }
       if (changed) {
@@ -937,17 +963,25 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
 
     // Ensure advisor SignalR connection is active with presence
+    String connId = _signalR.connectionId;
     try {
-      await _signalR.ensureConnected(
+      final ensured = await _signalR.ensureConnected(
         userName: req.advisorName,
         userId: _currentUserId,
         advisorProfileId: _currentAdvisorProfileId ?? req.advisorId,
         isAdvisor: true,
         requestId: req.id,
       );
+      if (ensured.isNotEmpty) {
+        connId = ensured;
+      }
     } catch (_) {}
 
-    final connId = _signalR.connectionId.isNotEmpty ? _signalR.connectionId : 'mobile';
+    if (connId.isEmpty && _signalR.connectionId.isNotEmpty) {
+      connId = _signalR.connectionId;
+    }
+    if (connId.isEmpty) connId = 'mobile';
+
     final acceptResult = await _chatService.acceptChat(req.id, connectId: connId);
     req.isAccepted = true;
 
@@ -986,8 +1020,9 @@ class SessionProvider extends ChangeNotifier {
     // Connect advisor to SignalR chat session group & register advisor connection info (matching Angular parity)
     try {
       await _signalR.connectAdvisorToChat(req.advisorName, connId, req.id);
-      if (_signalR.connectionId.isNotEmpty) {
-        await _chatService.updateAdvisorConnectionInfo(req.id, _signalR.connectionId);
+      final activeConn = _signalR.connectionId.isNotEmpty ? _signalR.connectionId : connId;
+      if (activeConn.isNotEmpty && activeConn != 'mobile') {
+        await _chatService.updateAdvisorConnectionInfo(req.id, activeConn);
       }
     } catch (e) {
       debugPrint("connectAdvisorToChat / updateAdvisorConnectionInfo error: $e");
