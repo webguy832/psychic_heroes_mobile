@@ -347,12 +347,18 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.onlineGreen),
                       icon: const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
                       label: const Text("ACCEPT SESSION", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        sessionProv.acceptSessionRequest(req);
+                      onPressed: () async {
+                        Widget targetScreen = const LiveSessionScreen(isAdvisorView: true);
+                        if (req.type == SessionType.video) {
+                          targetScreen = const VideoCallScreen(isAdvisorView: true);
+                        } else if (req.type == SessionType.call) {
+                          targetScreen = const VoiceCallScreen(isAdvisorView: true);
+                        }
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const LiveSessionScreen(isAdvisorView: true)),
+                          MaterialPageRoute(builder: (_) => targetScreen),
                         );
+                        await sessionProv.acceptSessionRequest(req);
                       },
                     ),
                   ),
@@ -429,8 +435,8 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                 clientName: user?.displayName ?? "Client",
                 advisorId: "advisor",
                 advisorName: "Advisor",
-                type: SessionType.call,
-                ratePerMinute: 3.99,
+                type: SessionType.chat,
+                ratePerMinute: 0.49,
               );
             },
           ),

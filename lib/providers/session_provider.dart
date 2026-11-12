@@ -957,6 +957,7 @@ class SessionProvider extends ChangeNotifier {
     _currentUserId = _currentAdvisorProfileId ?? req.advisorId;
     _currentUserName = req.advisorName;
     _activeRequest = req;
+    _sessionType = req.type;
     _incomingRequests.clear();
     _chatMessages.clear();
     _sessionState = SessionState.active;

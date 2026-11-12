@@ -118,12 +118,6 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
       _scrollToBottom();
     }
 
-    final isVideo = sessionProv.sessionType == SessionType.video;
-    final isCall = sessionProv.sessionType == SessionType.call || isVideo;
-    final sessionLabel = isVideo
-        ? "LIVE VIDEO CALL"
-        : (sessionProv.sessionType == SessionType.call ? "LIVE VOICE CALL" : "LIVE CHAT SESSION");
-
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
@@ -133,54 +127,60 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.accentGold),
           onPressed: () => _confirmEndSession(context, sessionProv),
         ),
+        titleSpacing: 0,
         title: Row(
           children: [
             CircleAvatar(
-              radius: 18,
-              backgroundColor: isVideo ? AppColors.accentCyan : AppColors.accentGold,
+              radius: 17,
+              backgroundColor: AppColors.accentGold,
               child: Text(
                 titleName.isNotEmpty ? titleName[0].toUpperCase() : 'P',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 14),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     titleName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                     overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 2),
                   Row(
                     children: [
                       Container(
-                        width: 8,
-                        height: 8,
+                        width: 7,
+                        height: 7,
                         decoration: const BoxDecoration(
                           color: AppColors.onlineGreen,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        sessionLabel,
+                      const SizedBox(width: 4),
+                      const Text(
+                        "LIVE CHAT",
                         style: TextStyle(
-                          fontSize: 10,
-                          color: isVideo ? AppColors.accentCyan : AppColors.onlineGreen,
+                          fontSize: 9,
+                          color: AppColors.onlineGreen,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        sessionProv.isChargingStarted
-                            ? "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)})"
-                            : "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Grace: ${sessionProv.secondsUntilCharging}s left)",
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: sessionProv.isChargingStarted ? AppColors.onlineGreen : AppColors.accentGold,
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          sessionProv.isChargingStarted
+                              ? "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)})"
+                              : "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Grace: ${sessionProv.secondsUntilCharging}s)",
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: sessionProv.isChargingStarted ? AppColors.onlineGreen : AppColors.accentGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -192,26 +192,27 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
         ),
         actions: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
               color: AppColors.bgDark,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.borderGold),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.timer_rounded, size: 14, color: AppColors.accentGold),
+                const Icon(Icons.timer_rounded, size: 13, color: AppColors.accentGold),
                 const SizedBox(width: 4),
                 Text(
                   sessionProv.formattedTimer,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accentGold),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accentGold),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 8),
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.errorRed,
@@ -220,10 +221,10 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 14),
-              label: Text(
-                isCall ? "END CALL" : "END CHAT",
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
+              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
+              label: const Text(
+                "END CHAT",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
               ),
               onPressed: () => _confirmEndSession(context, sessionProv),
             ),
@@ -232,12 +233,6 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
       ),
       body: Column(
         children: [
-          // Media Viewport: Video Call or Voice Call Header
-          if (isVideo)
-            _buildVideoCallViewport(sessionProv, titleName)
-          else if (sessionProv.sessionType == SessionType.call)
-            _buildVoiceCallHeader(sessionProv, titleName),
-
           // Active Free Minutes Notice Banner
           if (sessionProv.freeLeftSeconds > 0)
             Container(
@@ -419,233 +414,6 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
 
           // Chat Bottom Bar / Input Field
           _buildMessageInputField(context, sessionProv, user?.displayName ?? "User"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVideoCallViewport(SessionProvider sessionProv, String titleName) {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      margin: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accentCyan.withOpacity(0.6), width: 1.5),
-        boxShadow: [
-          BoxShadow(color: AppColors.accentCyan.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Remote Participant Main Video Container
-          Center(
-            child: sessionProv.isVideoOn
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.accentCyan.withOpacity(0.15),
-                          border: Border.all(color: AppColors.accentCyan, width: 2),
-                          boxShadow: [
-                            BoxShadow(color: AppColors.accentCyan.withOpacity(0.3), blurRadius: 16),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 36,
-                          backgroundColor: AppColors.accentPurple,
-                          child: Text(
-                            titleName.isNotEmpty ? titleName[0].toUpperCase() : 'V',
-                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            "$titleName (Live 1080p HD Video)",
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.videocam_off_rounded, color: Colors.white54, size: 40),
-                      SizedBox(height: 6),
-                      Text("Camera Paused", style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 2),
-                      Text("Tap video button below to unpause", style: TextStyle(color: Colors.white38, fontSize: 10)),
-                    ],
-                  ),
-          ),
-
-          // PIP Local Camera Thumbnail (Top Right)
-          Positioned(
-            top: 12,
-            right: 12,
-            child: Container(
-              width: 80,
-              height: 100,
-              decoration: BoxDecoration(
-                color: sessionProv.isVideoOn ? const Color(0xFF1E293B) : AppColors.bgDarkCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: sessionProv.isVideoOn ? AppColors.accentCyan : AppColors.borderDark, width: 1.5),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  if (sessionProv.isVideoOn) ...[
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: AppColors.accentPurple,
-                          child: Icon(Icons.person_rounded, color: Colors.white, size: 16),
-                        ),
-                        SizedBox(height: 4),
-                        Text("Self Cam", style: TextStyle(color: AppColors.accentCyan, fontSize: 9, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle),
-                      ),
-                    ),
-                  ] else ...[
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.videocam_off_rounded, color: AppColors.errorRed, size: 20),
-                        SizedBox(height: 2),
-                        Text("Off", style: TextStyle(color: Colors.white70, fontSize: 9)),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
-          // Embedded Video Controls Overlay Bar (Bottom)
-          Positioned(
-            bottom: 8,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      sessionProv.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                      color: sessionProv.isMuted ? AppColors.errorRed : AppColors.accentGold,
-                      size: 20,
-                    ),
-                    onPressed: () => sessionProv.toggleMute(),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      sessionProv.isSpeakerOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      color: sessionProv.isSpeakerOn ? AppColors.onlineGreen : Colors.grey,
-                      size: 20,
-                    ),
-                    onPressed: () => sessionProv.toggleSpeaker(),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      sessionProv.isVideoOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-                      color: sessionProv.isVideoOn ? AppColors.accentCyan : Colors.grey,
-                      size: 20,
-                    ),
-                    onPressed: () => sessionProv.toggleVideo(),
-                  ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.errorRed,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 14),
-                    label: const Text("END", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
-                    onPressed: () => _confirmEndSession(context, sessionProv),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVoiceCallHeader(SessionProvider sessionProv, String titleName) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-        border: Border(bottom: BorderSide(color: AppColors.borderDark)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          IconButton(
-            icon: Icon(
-              sessionProv.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-              color: sessionProv.isMuted ? AppColors.errorRed : AppColors.accentGold,
-            ),
-            onPressed: () => sessionProv.toggleMute(),
-          ),
-          IconButton(
-            icon: Icon(
-              sessionProv.isSpeakerOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-              color: sessionProv.isSpeakerOn ? AppColors.onlineGreen : Colors.grey,
-            ),
-            onPressed: () => sessionProv.toggleSpeaker(),
-          ),
-          IconButton(
-            icon: Icon(
-              sessionProv.isVideoOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-              color: sessionProv.isVideoOn ? AppColors.accentCyan : Colors.grey,
-            ),
-            onPressed: () => sessionProv.toggleVideo(),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRed,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            ),
-            icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 18),
-            label: const Text("END CALL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            onPressed: () => _confirmEndSession(context, sessionProv),
-          ),
         ],
       ),
     );
