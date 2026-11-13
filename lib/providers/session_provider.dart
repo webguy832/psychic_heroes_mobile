@@ -81,6 +81,7 @@ class SessionProvider extends ChangeNotifier {
 
   SessionRequestItem? _activeRequest;
   List<SessionRequestItem> _incomingRequests = [];
+  final Set<String> _handledRequestIds = {};
   List<ChatMessageItem> _chatMessages = [];
 
   // Active timers & safety nets
@@ -118,6 +119,9 @@ class SessionProvider extends ChangeNotifier {
   // Getters
   bool get isCurrentUserAdvisor => _isCurrentUserAdvisor;
   bool get isAdvisorOnline => _isAdvisorOnline;
+  bool get isAdvisorInActiveSession =>
+      _isCurrentUserAdvisor &&
+      (_sessionState == SessionState.active || _sessionState == SessionState.hold);
   SessionState get sessionState => _sessionState;
   SessionType get sessionType => _sessionType;
   SessionRequestItem? get activeRequest => _activeRequest;
@@ -277,6 +281,11 @@ class SessionProvider extends ChangeNotifier {
     int freeMinutes = 0,
     double userBalance = 0.0,
   }) async {
+    // Avoid duplicate initiation if already waiting or active
+    if (_sessionState == SessionState.waitingForAdvisor || _sessionState == SessionState.active) {
+      return;
+    }
+
     _stopAllTimers();
     _sessionType = type;
     _chatMessages.clear();
@@ -457,7 +466,12 @@ class SessionProvider extends ChangeNotifier {
   void _handleIncomingChatRequest(IncomingChatRequestRealtime req) {
     if (!_isAdvisorOnline) return;
 
-    // Avoid duplicate requests
+    // Suppress incoming requests if advisor is currently in an active or on-hold session
+    if (_sessionState == SessionState.active || _sessionState == SessionState.hold) return;
+
+    // Avoid duplicate or already handled requests
+    if (_handledRequestIds.contains(req.requestId)) return;
+    if (_activeRequest?.id == req.requestId) return;
     if (_incomingRequests.any((r) => r.id == req.requestId)) return;
 
     final item = SessionRequestItem(
@@ -545,6 +559,7 @@ class SessionProvider extends ChangeNotifier {
         ? (payload['requestId']?.toString() ?? payload['RequestId']?.toString() ?? payload['id']?.toString())
         : payload?.toString();
     if (reqId != null && reqId.isNotEmpty) {
+      _handledRequestIds.add(reqId);
       _incomingRequests.removeWhere((r) => r.id == reqId);
     }
     // If cancellation is specifically for a different request, do not cancel the active request
@@ -563,6 +578,9 @@ class SessionProvider extends ChangeNotifier {
   }
 
   void _handleRemoteChatEnded(dynamic payload) {
+    if (_activeRequest?.id != null) {
+      _handledRequestIds.add(_activeRequest!.id);
+    }
     if (_sessionState == SessionState.active || _sessionState == SessionState.hold) {
       _stopAllTimers();
       _sessionState = SessionState.ended;
@@ -902,13 +920,17 @@ class SessionProvider extends ChangeNotifier {
 
   Future<void> _pollAdvisorRequestsOnce(String advisorProfileId, String advisorName) async {
     if (!_isAdvisorOnline) return;
+    if (_sessionState == SessionState.active || _sessionState == SessionState.hold) return;
     try {
       final requests = await _chatService.getChatRequests(advisorProfileId);
+      if (_sessionState == SessionState.active || _sessionState == SessionState.hold) return;
       if (requests.isNotEmpty) {
         bool changed = false;
         for (var r in requests) {
           final id = r['requestId']?.toString() ?? r['RequestId']?.toString() ?? r['id']?.toString() ?? '';
           if (id.isEmpty) continue;
+          if (_handledRequestIds.contains(id)) continue;
+          if (_activeRequest?.id == id) continue;
           if (_incomingRequests.any((existing) => existing.id == id)) continue;
 
           final clientName = r['clientName']?.toString() ??
@@ -951,6 +973,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<bool> acceptSessionRequest(SessionRequestItem req) async {
+    _handledRequestIds.add(req.id);
     _advisorIncomingRequestsTimer?.cancel();
     _advisorIncomingRequestsTimer = null;
     _isCurrentUserAdvisor = true;
@@ -958,6 +981,7 @@ class SessionProvider extends ChangeNotifier {
     _currentUserName = req.advisorName;
     _activeRequest = req;
     _sessionType = req.type;
+    _incomingRequests.removeWhere((r) => r.id == req.id);
     _incomingRequests.clear();
     _chatMessages.clear();
     _sessionState = SessionState.active;
@@ -1037,6 +1061,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> declineSessionRequest(SessionRequestItem req) async {
+    _handledRequestIds.add(req.id);
     _incomingRequests.removeWhere((r) => r.id == req.id);
     await _chatService.cancelChat(req.id);
     if (_activeRequest?.id == req.id) {
@@ -1048,6 +1073,9 @@ class SessionProvider extends ChangeNotifier {
 
   Future<void> cancelSessionRequest() async {
     final reqId = _activeRequest?.id;
+    if (reqId != null) {
+      _handledRequestIds.add(reqId);
+    }
     _stopAllTimers();
     if (reqId != null && !reqId.startsWith("req_")) {
       await _chatService.cancelChat(reqId);
@@ -1060,6 +1088,9 @@ class SessionProvider extends ChangeNotifier {
 
   Future<void> endSession({String? endedBy}) async {
     final reqId = _activeRequest?.id;
+    if (reqId != null) {
+      _handledRequestIds.add(reqId);
+    }
     final totalSecs = _elapsedSeconds;
     _stopAllTimers();
 

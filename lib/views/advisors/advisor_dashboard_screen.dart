@@ -18,6 +18,7 @@ class AdvisorDashboardScreen extends StatefulWidget {
 
 class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   bool _isDialogShowing = false;
+  String? _currentShowingDialogRequestId;
 
   @override
   void initState() {
@@ -43,42 +44,73 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   }
 
   void _checkAndShowIncomingRequestDialog(BuildContext context, SessionProvider sessionProv) {
-    if (sessionProv.incomingRequests.isNotEmpty && !_isDialogShowing) {
-      final req = sessionProv.incomingRequests.first;
-      _isDialogShowing = true;
+    // If advisor is currently in an active or on-hold session, NEVER show incoming request dialogs
+    if (sessionProv.sessionState == SessionState.active || sessionProv.sessionState == SessionState.hold) {
+      return;
+    }
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogCtx) {
-            return _IncomingRequestDialogModal(
-              req: req,
-              onAccept: () async {
-                _isDialogShowing = false;
-                Navigator.of(dialogCtx).pop();
-                Widget targetScreen = const LiveSessionScreen(isAdvisorView: true);
-                if (req.type == SessionType.video) {
-                  targetScreen = const VideoCallScreen(isAdvisorView: true);
-                } else if (req.type == SessionType.call) {
-                  targetScreen = const VoiceCallScreen(isAdvisorView: true);
-                }
+    if (sessionProv.incomingRequests.isEmpty || _isDialogShowing) {
+      return;
+    }
+
+    final req = sessionProv.incomingRequests.first;
+    if (_currentShowingDialogRequestId == req.id) {
+      return;
+    }
+
+    _isDialogShowing = true;
+    _currentShowingDialogRequestId = req.id;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || sessionProv.sessionState == SessionState.active || sessionProv.sessionState == SessionState.hold) {
+        _isDialogShowing = false;
+        _currentShowingDialogRequestId = null;
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogCtx) {
+          return _IncomingRequestDialogModal(
+            req: req,
+            onAccept: () async {
+              Navigator.of(dialogCtx).pop();
+              Widget targetScreen = const LiveSessionScreen(isAdvisorView: true);
+              if (req.type == SessionType.video) {
+                targetScreen = const VideoCallScreen(isAdvisorView: true);
+              } else if (req.type == SessionType.call) {
+                targetScreen = const VoiceCallScreen(isAdvisorView: true);
+              }
+
+              final acceptFuture = sessionProv.acceptSessionRequest(req);
+
+              if (mounted) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => targetScreen),
-                );
-                await sessionProv.acceptSessionRequest(req);
-              },
-              onDecline: (r) {
-                _isDialogShowing = false;
-                Navigator.of(dialogCtx).pop();
-                sessionProv.declineSessionRequest(r);
-              },
-            );
-          },
-        ).then((_) => _isDialogShowing = false);
+                ).then((_) {
+                  _isDialogShowing = false;
+                  _currentShowingDialogRequestId = null;
+                });
+              }
+              await acceptFuture;
+            },
+            onDecline: (r) {
+              Navigator.of(dialogCtx).pop();
+              _isDialogShowing = false;
+              _currentShowingDialogRequestId = null;
+              sessionProv.declineSessionRequest(r);
+            },
+          );
+        },
+      ).then((_) {
+        if (mounted && sessionProv.sessionState != SessionState.active) {
+          _isDialogShowing = false;
+          _currentShowingDialogRequestId = null;
+        }
       });
-    }
+    });
   }
 
   @override
@@ -348,17 +380,25 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                       icon: const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
                       label: const Text("ACCEPT SESSION", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                       onPressed: () async {
+                        _isDialogShowing = true;
+                        _currentShowingDialogRequestId = req.id;
                         Widget targetScreen = const LiveSessionScreen(isAdvisorView: true);
                         if (req.type == SessionType.video) {
                           targetScreen = const VideoCallScreen(isAdvisorView: true);
                         } else if (req.type == SessionType.call) {
                           targetScreen = const VoiceCallScreen(isAdvisorView: true);
                         }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => targetScreen),
-                        );
-                        await sessionProv.acceptSessionRequest(req);
+                        final acceptFuture = sessionProv.acceptSessionRequest(req);
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => targetScreen),
+                          ).then((_) {
+                            _isDialogShowing = false;
+                            _currentShowingDialogRequestId = null;
+                          });
+                        }
+                        await acceptFuture;
                       },
                     ),
                   ),
@@ -532,6 +572,7 @@ class _IncomingRequestDialogModal extends StatefulWidget {
 class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal> {
   int _remainingSeconds = 15;
   Timer? _timer;
+  bool _actionTaken = false;
   String _selectedReason = "Busy";
 
   @override
@@ -543,10 +584,15 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 1) {
-        setState(() => _remainingSeconds--);
+        if (mounted) {
+          setState(() => _remainingSeconds--);
+        }
       } else {
         timer.cancel();
-        widget.onDecline(widget.req);
+        if (!_actionTaken && mounted) {
+          _actionTaken = true;
+          widget.onDecline(widget.req);
+        }
       }
     });
   }
@@ -669,7 +715,13 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onPressed: () => widget.onDecline(widget.req),
+                    onPressed: _actionTaken
+                        ? null
+                        : () {
+                            _actionTaken = true;
+                            _timer?.cancel();
+                            widget.onDecline(widget.req);
+                          },
                     child: const Text("REJECT", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.ctaGreen)),
                   ),
                 ),
@@ -689,7 +741,13 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: widget.onAccept,
+                      onPressed: _actionTaken
+                          ? null
+                          : () {
+                              _actionTaken = true;
+                              _timer?.cancel();
+                              widget.onAccept();
+                            },
                       child: const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
                   ),

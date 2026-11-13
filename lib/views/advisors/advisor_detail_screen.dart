@@ -420,6 +420,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
   void _showStartSessionSheet(String mode, SessionEligibilityDto eligibility) {
     final adv = _advisor!;
     final rate = eligibility.advisorFees > 0 ? eligibility.advisorFees : adv.pricePerMinute;
+    bool isStarting = false;
 
     showModalBottomSheet(
       context: context,
@@ -502,6 +503,8 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () {
+                  if (isStarting) return;
+                  isStarting = true;
                   Navigator.pop(ctx);
                   final sessionProv = Provider.of<SessionProvider>(context, listen: false);
                   final user = Provider.of<UserProvider>(context, listen: false).user;
