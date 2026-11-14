@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/session_provider.dart';
+import '../main_navigation_screen.dart';
+import 'advisor_dashboard_screen.dart';
 
 class SessionAfterSummaryScreen extends StatefulWidget {
   final bool isAdvisorView;
@@ -29,9 +31,6 @@ class SessionAfterSummaryScreen extends StatefulWidget {
 }
 
 class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
-  int _selectedRating = 5;
-  final TextEditingController _reviewController = TextEditingController();
-  bool _reviewSubmitted = false;
   int _redirectSeconds = 10;
   Timer? _redirectTimer;
   bool _hasNavigated = false;
@@ -67,17 +66,30 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
     _hasNavigated = true;
     _redirectTimer?.cancel();
     _redirectTimer = null;
+
     final sessionProv = Provider.of<SessionProvider>(context, listen: false);
     sessionProv.resetSession();
-    // Return to root dashboard (Advisor Dashboard for advisors, Customer Home for users)
-    Navigator.popUntil(context, (route) => route.isFirst);
+
+    // Direct, infallible navigation to the dashboard matching web app parity
+    if (widget.isAdvisorView) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const AdvisorDashboardScreen()),
+        (route) => false,
+      );
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
   void dispose() {
     _redirectTimer?.cancel();
     _redirectTimer = null;
-    _reviewController.dispose();
     super.dispose();
   }
 
@@ -104,10 +116,10 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Column(
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // Top Status Icon & Completion Badge
             Container(
@@ -219,125 +231,14 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
 
             const SizedBox(height: 24),
 
-            // Rating & Review Section (For Customers)
-            if (!widget.isAdvisorView) ...[
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.bgDarkCard,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.borderGold.withOpacity(0.5)),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      "Rate Your Experience",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "How satisfied were you with ${widget.participantName}?",
-                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimaryDark),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 5-Star Selection Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(5, (index) {
-                        final star = index + 1;
-                        return IconButton(
-                          iconSize: 36,
-                          icon: Icon(
-                            star <= _selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                            color: AppColors.accentGold,
-                          ),
-                          onPressed: () => setState(() => _selectedRating = star),
-                        );
-                      }),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Optional Review Field
-                    if (!_reviewSubmitted) ...[
-                      TextField(
-                        controller: _reviewController,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
-                        maxLines: 3,
-                        onChanged: (text) {
-                          // Pause auto-redirect if customer is actively typing a review
-                          if (text.trim().isNotEmpty && _redirectTimer != null) {
-                            _redirectTimer?.cancel();
-                            _redirectTimer = null;
-                            if (mounted) setState(() => _redirectSeconds = 0);
-                          }
-                        },
-                        decoration: InputDecoration(
-                          hintText: "Write your review or feedback (optional)...",
-                          hintStyle: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12),
-                          filled: true,
-                          fillColor: AppColors.bgDark,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.borderDark),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 44,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accentGold,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _reviewSubmitted = true;
-                              _redirectSeconds = 3;
-                            });
-                            _startRedirectTimer();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Thank you! Your review has been submitted.")),
-                            );
-                          },
-                          child: const Text("Submit Review", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.onlineGreen.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.onlineGreen),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.check_circle_rounded, color: AppColors.onlineGreen, size: 18),
-                            SizedBox(width: 8),
-                            Text("Review Submitted Successfully!", style: TextStyle(color: AppColors.onlineGreen, fontWeight: FontWeight.bold, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            // Single Auto Redirect Countdown Notice (Matching Angular Web App Parity)
+            // Single Auto Redirect Countdown Notice (Immediately visible on any mobile viewport!)
             if (widget.isLiveSessionEnd && _redirectSeconds > 0) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.accentGold.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.accentGold.withOpacity(0.35)),
                 ),
                 child: Row(
@@ -366,7 +267,7 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
               ),
             ],
 
-            // Back to Dashboard Button (Identical for both Advisor and Customer, matching Web App parity)
+            // Go To Dashboard Button (Identical for both Advisor and Customer, matching Web App parity)
             SizedBox(
               width: double.infinity,
               height: 50,
