@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/utils/storage_service.dart';
 import '../services/chat_service.dart';
 import '../services/signalr_service.dart';
+import '../core/services/audio_service.dart';
 
 enum SessionType { call, chat, video }
 
@@ -446,6 +447,7 @@ class SessionProvider extends ChangeNotifier {
   // REAL-TIME SIGNALR EVENT HANDLERS & MESSAGE DELIVERY
   // ==========================================================
   void _handleAdvisorJoined(Map<String, dynamic> data) async {
+    AudioService.stopRingtone();
     if (_sessionState == SessionState.waitingForAdvisor) {
       _waitingTimer?.cancel();
       _waitingTimer = null;
@@ -555,6 +557,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   void _handleRemoteChatCancelled(dynamic payload) {
+    AudioService.stopRingtone();
     final reqId = payload is Map
         ? (payload['requestId']?.toString() ?? payload['RequestId']?.toString() ?? payload['id']?.toString())
         : payload?.toString();
@@ -1087,6 +1090,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> cancelSessionRequest() async {
+    AudioService.stopRingtone();
     final reqId = _activeRequest?.id;
     if (reqId != null) {
       _handledRequestIds.add(reqId);
@@ -1102,6 +1106,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> endSession({String? endedBy}) async {
+    AudioService.stopRingtone();
     final reqId = _activeRequest?.id;
     if (reqId != null) {
       _handledRequestIds.add(reqId);
@@ -1134,6 +1139,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   void resetSession() {
+    AudioService.stopRingtone();
     _stopAllTimers();
     _sessionState = SessionState.idle;
     _activeRequest = null;

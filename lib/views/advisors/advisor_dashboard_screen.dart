@@ -8,6 +8,7 @@ import '../../providers/user_provider.dart';
 import 'live_session_screen.dart';
 import 'video_call_screen.dart';
 import 'voice_call_screen.dart';
+import '../../core/services/audio_service.dart';
 
 class AdvisorDashboardScreen extends StatefulWidget {
   const AdvisorDashboardScreen({Key? key}) : super(key: key);
@@ -89,6 +90,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           return _IncomingRequestDialogModal(
             req: req,
             onAccept: () async {
+              AudioService.stopRingtone();
               _isDialogShowing = false;
               _currentShowingDialogRequestId = null;
               if (Navigator.of(dialogCtx).canPop()) {
@@ -115,6 +117,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               await acceptFuture;
             },
             onDecline: (r) {
+              AudioService.stopRingtone();
               _isDialogShowing = false;
               _currentShowingDialogRequestId = null;
               if (Navigator.of(dialogCtx).canPop()) {
@@ -125,6 +128,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           );
         },
       ).then((_) {
+        AudioService.stopRingtone();
         if (mounted && sessionProv.sessionState != SessionState.active && sessionProv.sessionState != SessionState.hold) {
           _isDialogShowing = false;
           _currentShowingDialogRequestId = null;
@@ -598,6 +602,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
   @override
   void initState() {
     super.initState();
+    AudioService.playRingtone();
     _startTimer();
   }
 
@@ -616,11 +621,13 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
         timer.cancel();
         _timer = null;
         _actionTaken = true;
+        AudioService.stopRingtone();
         return;
       }
       if (_actionTaken) {
         timer.cancel();
         _timer = null;
+        AudioService.stopRingtone();
         return;
       }
       if (_remainingSeconds > 1) {
@@ -630,6 +637,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
       } else {
         timer.cancel();
         _timer = null;
+        AudioService.stopRingtone();
         if (!_actionTaken && mounted) {
           _actionTaken = true;
           widget.onDecline(widget.req);
@@ -640,6 +648,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
 
   @override
   void dispose() {
+    AudioService.stopRingtone();
     _timer?.cancel();
     _timer = null;
     super.dispose();
@@ -761,6 +770,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                         ? null
                         : () {
                             _actionTaken = true;
+                            AudioService.stopRingtone();
                             _timer?.cancel();
                             _timer = null;
                             widget.onDecline(widget.req);
@@ -788,6 +798,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                           ? null
                           : () {
                               _actionTaken = true;
+                              AudioService.stopRingtone();
                               _timer?.cancel();
                               _timer = null;
                               widget.onAccept();

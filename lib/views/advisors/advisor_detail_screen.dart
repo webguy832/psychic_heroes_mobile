@@ -16,6 +16,7 @@ import '../user/login_screen.dart';
 import 'live_session_screen.dart';
 import 'video_call_screen.dart';
 import 'voice_call_screen.dart';
+import '../../core/services/audio_service.dart';
 
 class AdvisorDetailScreen extends StatefulWidget {
   final AdvisorDto? advisor;
@@ -539,6 +540,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
 
   void _showWaitingForAdvisorDialog(BuildContext context, String mode) {
     final adv = _advisor;
+    AudioService.playRingtone();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -547,6 +549,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
           builder: (context, sessionProv, child) {
             if (sessionProv.sessionState == SessionState.active) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                AudioService.stopRingtone();
                 Navigator.of(dialogCtx).pop();
                 Widget targetScreen = const LiveSessionScreen(isAdvisorView: false);
                 if (sessionProv.sessionType == SessionType.video) {
@@ -561,6 +564,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
               });
             } else if (sessionProv.sessionState == SessionState.declined) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                AudioService.stopRingtone();
                 Navigator.of(dialogCtx).pop();
                 showDialog(
                   context: context,
@@ -580,6 +584,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
               });
             } else if (sessionProv.sessionState == SessionState.noBalance) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                AudioService.stopRingtone();
                 Navigator.of(dialogCtx).pop();
                 Navigator.push(
                   context,
@@ -588,6 +593,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
               });
             } else if (sessionProv.sessionState == SessionState.busy || sessionProv.sessionState == SessionState.anotherSession) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                AudioService.stopRingtone();
                 Navigator.of(dialogCtx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -600,6 +606,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
               });
             } else if (sessionProv.sessionState == SessionState.cancelled) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                AudioService.stopRingtone();
                 Navigator.of(dialogCtx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Request was cancelled.")),
@@ -677,6 +684,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                       ),
                       onPressed: () {
+                        AudioService.stopRingtone();
                         sessionProv.cancelSessionRequest();
                         Navigator.of(dialogCtx).pop();
                       },
@@ -689,7 +697,10 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
           },
         );
       },
-    );
+    ).then((_) {
+      AudioService.stopRingtone();
+    });
+  }
   }
 
   Widget _buildBillingRow(String label, String value) {

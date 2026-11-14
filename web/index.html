@@ -46,6 +46,143 @@
         }
       });
     }
+
+    // Audio Player for Incoming Notifications & Ringtone (Matching Angular Web App)
+    (function() {
+      var audioCtx = null;
+      var ringInterval = null;
+      var ringAudioElement = null;
+      var isRingtoneActive = false;
+
+      function unlockAudioContext() {
+        try {
+          var AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          if (!audioCtx || audioCtx.state === 'closed') {
+            audioCtx = new AudioCtx();
+          }
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+        } catch (e) {
+          console.warn('AudioContext unlock error:', e);
+        }
+      }
+
+      // Unlock AudioContext on first user interaction anywhere
+      ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(function(evt) {
+        document.addEventListener(evt, function() {
+          unlockAudioContext();
+        }, { once: false, passive: true });
+      });
+
+      function playWebAudioChime() {
+        if (!isRingtoneActive) return;
+        try {
+          unlockAudioContext();
+          if (!audioCtx) return;
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          var now = audioCtx.currentTime;
+
+          function playNote(freq, start, duration) {
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + start);
+            gain.gain.setValueAtTime(0.35, now + start);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + start);
+            osc.stop(now + start + duration);
+          }
+
+          // Dual-tone melodic chime sequence (C5, E5, G5, C6) matching Angular parity
+          playNote(523.25, 0.00, 0.35);
+          playNote(659.25, 0.15, 0.35);
+          playNote(783.99, 0.30, 0.50);
+          playNote(1046.50, 0.45, 0.60);
+
+          playNote(523.25, 0.85, 0.35);
+          playNote(659.25, 1.00, 0.35);
+          playNote(783.99, 1.15, 0.50);
+          playNote(1046.50, 1.30, 0.60);
+        } catch (e) {
+          console.warn('playWebAudioChime error:', e);
+        }
+      }
+
+      function startWebAudioSynthLoop() {
+        if (!isRingtoneActive || ringInterval) return;
+        playWebAudioChime();
+        ringInterval = setInterval(function() {
+          if (!isRingtoneActive) {
+            if (ringInterval) {
+              clearInterval(ringInterval);
+              ringInterval = null;
+            }
+            return;
+          }
+          playWebAudioChime();
+        }, 2500);
+      }
+
+      window.playRingtoneSound = function() {
+        unlockAudioContext();
+        window.stopRingtoneSound();
+        isRingtoneActive = true;
+        var htmlFailed = false;
+
+        try {
+          if (!ringAudioElement) {
+            ringAudioElement = new Audio('sounds/ringtone.ogg');
+            ringAudioElement.loop = true;
+            ringAudioElement.volume = 0.75;
+          }
+          ringAudioElement.currentTime = 0;
+          var p = ringAudioElement.play();
+          if (p !== undefined) {
+            p.then(function() {
+              if (!isRingtoneActive && ringAudioElement) {
+                ringAudioElement.pause();
+                ringAudioElement.currentTime = 0;
+              }
+            }).catch(function(err) {
+              console.warn('HTML5 ringtone restricted or failed, falling back to Web Audio synth chime:', err);
+              htmlFailed = true;
+              startWebAudioSynthLoop();
+            });
+          }
+        } catch (e) {
+          console.warn('HTML5 ringtone error, falling back to Web Audio synth chime:', e);
+          htmlFailed = true;
+          startWebAudioSynthLoop();
+        }
+
+        setTimeout(function() {
+          if (!isRingtoneActive) return;
+          if (htmlFailed || (ringAudioElement && ringAudioElement.paused)) {
+            startWebAudioSynthLoop();
+          }
+        }, 500);
+      };
+
+      window.stopRingtoneSound = function() {
+        isRingtoneActive = false;
+        if (ringInterval) {
+          clearInterval(ringInterval);
+          ringInterval = null;
+        }
+        if (ringAudioElement) {
+          try {
+            ringAudioElement.pause();
+            ringAudioElement.currentTime = 0;
+          } catch (e) {}
+        }
+      };
+    })();
   </script>
 </head>
 <body>
