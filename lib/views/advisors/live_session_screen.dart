@@ -78,7 +78,7 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Session has been ended by ${widget.isAdvisorView ? 'Client' : 'Advisor'} ($titleName). Redirecting..."),
-            backgroundColor: AppColors.primary,
+            backgroundColor: const Color(0xFF4F46E5),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -122,26 +122,52 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFEEF2FF),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF4338CA), // Deep Indigo
+                Color(0xFF4F46E5), // Indigo
+                Color(0xFF6366F1), // Vibrant Indigo
+                Color(0xFF818CF8), // Soft Light Indigo
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x404338CA),
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
         elevation: 2,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.accentGold),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => _confirmEndSession(context, sessionProv),
         ),
         titleSpacing: 0,
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 17,
-              backgroundColor: AppColors.accentGold,
-              child: Text(
-                titleName.isNotEmpty ? titleName[0].toUpperCase() : 'P',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 14),
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+              ),
+              child: CircleAvatar(
+                radius: 17,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Text(
+                  titleName.isNotEmpty ? titleName[0].toUpperCase() : 'P',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 9),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,7 +185,7 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
                         width: 7,
                         height: 7,
                         decoration: const BoxDecoration(
-                          color: AppColors.onlineGreen,
+                          color: Color(0xFF34D399),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -168,19 +194,20 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
                         "LIVE CHAT",
                         style: TextStyle(
                           fontSize: 9,
-                          color: AppColors.onlineGreen,
+                          color: Color(0xFFD1FAE5),
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0.4,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           sessionProv.isChargingStarted
-                              ? "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)})"
-                              : "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Grace: ${sessionProv.secondsUntilCharging}s)",
+                              ? "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min"
+                              : "• Grace: ${sessionProv.secondsUntilCharging}s left",
                           style: TextStyle(
                             fontSize: 9,
-                            color: sessionProv.isChargingStarted ? AppColors.onlineGreen : AppColors.accentGold,
+                            color: Colors.white.withOpacity(0.9),
                             fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -194,230 +221,342 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
           ],
         ),
         actions: [
+          // Frosted Glass Timer Badge (Matching Web App)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.bgDark,
+              color: Colors.white.withOpacity(0.18),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderGold),
+              border: Border.all(color: Colors.white.withOpacity(0.25)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.timer_rounded, size: 13, color: AppColors.accentGold),
+                const Icon(Icons.timer_outlined, size: 13, color: Colors.white),
                 const SizedBox(width: 4),
                 Text(
                   sessionProv.formattedTimer,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accentGold),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 6),
+          // End Chat Button (Matching Web App Style)
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: ElevatedButton.icon(
+            child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.errorRed,
+                backgroundColor: Colors.white.withOpacity(0.15),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                side: BorderSide(color: Colors.white.withOpacity(0.3)),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
-              label: const Text(
-                "END CHAT",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.close_rounded, color: Colors.white, size: 13),
+                  SizedBox(width: 3),
+                  Text(
+                    "End",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
+                  ),
+                ],
               ),
               onPressed: () => _confirmEndSession(context, sessionProv),
             ),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Active Free Minutes Notice Banner
-          if (sessionProv.freeLeftSeconds > 0)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFF1E3A2B),
-              child: Row(
-                children: [
-                  const Icon(Icons.stars_rounded, color: AppColors.accentGold, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Free Promotional Chat: ${(sessionProv.freeLeftSeconds ~/ 60) + 1}m remaining free",
-                      style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Free Minutes Finished Transition Notice
-          if (sessionProv.showFreeFinishedNotice)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFF3B2E1E),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      "Free minutes finished. Session continuing from main wallet.",
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => sessionProv.dismissFreeFinishedNotice(),
-                    child: const Text("DISMISS", style: TextStyle(color: AppColors.accentGold, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-
-          // Low Balance Warning Banner (<= 3 mins left)
-          if (sessionProv.isLowBalanceWarning && !widget.isAdvisorView)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFF4A1E1E),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      "Low Balance: Less than 3 minutes remaining.",
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.ctaGreen,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      minimumSize: Size.zero,
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AddFundsScreen()),
-                      );
-                    },
-                    child: const Text("ADD FUNDS", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-
-          // On-Hold Notice Banner / Action
-          if (sessionProv.sessionState == SessionState.hold)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: const Color(0xFF3B1E1E),
-              child: Column(
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.pause_circle_filled_rounded, color: AppColors.errorRed, size: 22),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "Session Paused: Wallet balance depleted.",
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Session timer is paused. Add funds to immediately resume chatting with your advisor.",
-                    style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.ctaGreen),
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AddFundsScreen()),
-                      );
-                      sessionProv.resumeHeldSession(sessionProv.userBalance > 0 ? sessionProv.userBalance : 10.0);
-                    },
-                    child: const Text("ADD FUNDS & RESUME", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-
-          // Chat Messages List
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: sessionProv.chatMessages.length,
-              itemBuilder: (context, index) {
-                final msg = sessionProv.chatMessages[index];
-                final isMe = !msg.isOpponent;
-
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isMe ? AppColors.primaryLight : AppColors.bgDarkCard,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
-                      ),
-                      border: Border.all(
-                        color: isMe ? AppColors.accentGold.withOpacity(0.4) : AppColors.borderDark,
+      body: Container(
+        // Web App Soft Pastel Gradient Background (#eef2ff -> #e0e7ff -> #ede9fe -> #f0f4ff)
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFEEF2FF), // soft indigo
+              Color(0xFFE0E7FF), // light periwinkle
+              Color(0xFFEDE9FE), // lavender
+              Color(0xFFEEF2FF), // soft airy white/blue
+              Color(0xFFF0F4FF),
+            ],
+            stops: [0.0, 0.25, 0.5, 0.75, 1.0],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Active Free Minutes Notice Banner
+            if (sessionProv.freeLeftSeconds > 0)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFECFDF5),
+                  border: Border(bottom: BorderSide(color: Color(0xFFA7F3D0))),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.stars_rounded, color: Color(0xFF059669), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Free Promotional Chat: ${(sessionProv.freeLeftSeconds ~/ 60) + 1}m remaining free",
+                        style: const TextStyle(color: Color(0xFF065F46), fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  ],
+                ),
+              ),
+
+            // Free Minutes Finished Transition Notice
+            if (sessionProv.showFreeFinishedNotice)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFFBEB),
+                  border: Border(bottom: BorderSide(color: Color(0xFFFDE68A))),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        "Free minutes finished. Session continuing from main wallet.",
+                        style: TextStyle(color: Color(0xFF92400E), fontSize: 12),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => sessionProv.dismissFreeFinishedNotice(),
+                      child: const Text("DISMISS", style: TextStyle(color: Color(0xFFB45309), fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Low Balance Warning Banner (<= 3 mins left)
+            if (sessionProv.isLowBalanceWarning && !widget.isAdvisorView)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFF1F2),
+                  border: Border(bottom: BorderSide(color: Color(0xFFFECDD3))),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        "Low Balance: Less than 3 minutes remaining.",
+                        style: TextStyle(color: Color(0xFF9F1239), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: Size.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AddFundsScreen()),
+                        );
+                      },
+                      child: const Text("ADD FUNDS", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+
+            // On-Hold Notice Banner / Action
+            if (sessionProv.sessionState == SessionState.hold)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF2F2),
+                  border: Border(bottom: BorderSide(color: Color(0xFFFCA5A5))),
+                ),
+                child: Column(
+                  children: [
+                    const Row(
                       children: [
-                        Text(
-                          msg.senderName,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isMe ? AppColors.accentGold : AppColors.accentCyan,
+                        Icon(Icons.pause_circle_filled_rounded, color: Color(0xFFDC2626), size: 22),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Session Paused: Wallet balance depleted.",
+                            style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          msg.message,
-                          style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.3),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "${msg.timestamp.toLocal().hour}:${msg.timestamp.toLocal().minute.toString().padLeft(2, '0')}",
-                          style: const TextStyle(fontSize: 9, color: AppColors.textPrimaryDark),
                         ),
                       ],
                     ),
-                  ),
-                );
-              },
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Session timer is paused. Add funds to immediately resume chatting with your advisor.",
+                      style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AddFundsScreen()),
+                        );
+                        sessionProv.resumeHeldSession(sessionProv.userBalance > 0 ? sessionProv.userBalance : 10.0);
+                      },
+                      child: const Text("ADD FUNDS & RESUME", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Chat Messages List
+            Expanded(
+              child: sessionProv.chatMessages.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.85),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF6366F1), size: 36),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            "Connected to Live Chat",
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF334155)),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Say hello to begin your session!",
+                            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      itemCount: sessionProv.chatMessages.length,
+                      itemBuilder: (context, index) {
+                        final msg = sessionProv.chatMessages[index];
+                        final isMe = !msg.isOpponent;
+
+                        return Align(
+                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: isMe
+                                ? BoxDecoration(
+                                    // Sent Bubble: Vibrant Indigo Gradient matching Web App
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                                    ),
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(18),
+                                      topRight: Radius.circular(4),
+                                      bottomLeft: Radius.circular(18),
+                                      bottomRight: Radius.circular(18),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF6366F1).withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  )
+                                : BoxDecoration(
+                                    // Received Bubble: Crisp White Card matching Web App
+                                    color: Colors.white,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(4),
+                                      topRight: Radius.circular(18),
+                                      bottomLeft: Radius.circular(18),
+                                      bottomRight: Radius.circular(18),
+                                    ),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.04),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                            child: Column(
+                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                if (!isMe) ...[
+                                  Text(
+                                    msg.senderName,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF4F46E5),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                ],
+                                Text(
+                                  msg.message,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isMe ? Colors.white : const Color(0xFF1E293B),
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "${msg.timestamp.toLocal().hour}:${msg.timestamp.toLocal().minute.toString().padLeft(2, '0')}",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isMe ? Colors.white.withOpacity(0.7) : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
             ),
-          ),
 
-          // Quick Response Suggestions (for Advisors)
-          if (widget.isAdvisorView) _buildQuickReplies(sessionProv),
+            // Quick Response Suggestions (for Advisors)
+            if (widget.isAdvisorView) _buildQuickReplies(sessionProv),
 
-          // Chat Bottom Bar / Input Field
-          _buildMessageInputField(context, sessionProv, user?.displayName ?? "User"),
-        ],
+            // Chat Bottom Bar / Input Field (Clean White Card matching Web App)
+            _buildMessageInputField(context, sessionProv, user?.displayName ?? "User"),
+          ],
+        ),
       ),
     );
   }
@@ -441,11 +580,14 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ActionChip(
-              backgroundColor: AppColors.bgDarkCard,
-              side: const BorderSide(color: AppColors.borderDark),
+              backgroundColor: Colors.white,
+              elevation: 1,
+              shadowColor: Colors.black.withOpacity(0.04),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               label: Text(
                 quickTexts[i],
-                style: const TextStyle(fontSize: 11, color: AppColors.textPrimaryDark),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF4338CA), fontWeight: FontWeight.w500),
               ),
               onPressed: () {
                 sessionProv.sendChatMessage(
@@ -465,38 +607,62 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
 
   Widget _buildMessageInputField(BuildContext context, SessionProvider sessionProv, String userName) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: AppColors.bgDarkCard,
-        border: Border(top: BorderSide(color: AppColors.borderDark)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
+        top: false,
         child: Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: _msgController,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "Type your message...",
-                  hintStyle: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13),
-                  filled: true,
-                  fillColor: AppColors.bgDark,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: AppColors.borderDark),
-                  ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                onSubmitted: (_) => _sendMessage(sessionProv, userName),
+                child: TextField(
+                  controller: _msgController,
+                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 14),
+                  decoration: const InputDecoration(
+                    hintText: "Type your message...",
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _sendMessage(sessionProv, userName),
+                ),
               ),
             ),
             const SizedBox(width: 8),
-            CircleAvatar(
-              backgroundColor: AppColors.accentGold,
-              radius: 20,
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: IconButton(
-                icon: const Icon(Icons.send_rounded, color: Colors.black, size: 18),
+                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
                 onPressed: () => _sendMessage(sessionProv, userName),
               ),
             ),
@@ -525,19 +691,24 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgDarkCard,
-        title: const Text("End Live Session?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("End Live Session?", style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold)),
         content: Text(
           "Total Duration: ${sessionProv.formattedTimer}\nEstimated Cost: \$${sessionProv.currentSessionCost.toStringAsFixed(2)}",
-          style: const TextStyle(color: AppColors.textPrimaryDark),
+          style: const TextStyle(color: Color(0xFF64748B), height: 1.4),
         ),
         actions: [
           TextButton(
-            child: const Text("Cancel", style: TextStyle(color: Colors.white)),
+            child: const Text("Cancel", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
             onPressed: () => Navigator.pop(ctx),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
             child: const Text("End Session", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             onPressed: () async {
               final activeReq = sessionProv.activeRequest;
