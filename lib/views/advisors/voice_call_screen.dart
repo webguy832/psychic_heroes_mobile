@@ -93,6 +93,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
               formattedTime: sessionProv.formattedTimer,
               totalCost: finalCost,
               sessionTypeLabel: "Voice Call",
+              advisorId: activeReq?.advisorId,
             ),
           ),
         );
@@ -469,6 +470,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                     formattedTime: durationStr,
                     totalCost: finalCost,
                     sessionTypeLabel: "Voice Call",
+                    advisorId: activeReq?.advisorId,
                   ),
                 ),
               );

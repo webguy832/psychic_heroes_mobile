@@ -5,3 +5,4 @@ void playRingtonePlatform() {
 void stopRingtonePlatform() {
   // Native mobile stub
 }
+

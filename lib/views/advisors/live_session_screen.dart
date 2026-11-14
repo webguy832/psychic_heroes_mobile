@@ -96,6 +96,7 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
               formattedTime: sessionProv.formattedTimer,
               totalCost: finalCost,
               sessionTypeLabel: "Live Chat",
+              advisorId: activeReq?.advisorId,
             ),
           ),
         );
@@ -561,6 +562,7 @@ class _LiveSessionScreenState extends State<LiveSessionScreen> {
                     formattedTime: timeStr,
                     totalCost: finalCost,
                     sessionTypeLabel: "Live Chat",
+                    advisorId: activeReq?.advisorId,
                   ),
                 ),
               );

@@ -12,3 +12,4 @@ void stopRingtonePlatform() {
     js.context.callMethod('stopRingtoneSound');
   } catch (_) {}
 }
+

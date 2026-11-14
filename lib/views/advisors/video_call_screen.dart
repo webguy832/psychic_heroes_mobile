@@ -94,6 +94,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               formattedTime: sessionProv.formattedTimer,
               totalCost: finalCost,
               sessionTypeLabel: "Video Call",
+              advisorId: activeReq?.advisorId,
             ),
           ),
         );
@@ -606,6 +607,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     formattedTime: durationStr,
                     totalCost: finalCost,
                     sessionTypeLabel: "Video Call",
+                    advisorId: activeReq?.advisorId,
                   ),
                 ),
               );
