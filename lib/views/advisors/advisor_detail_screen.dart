@@ -701,7 +701,6 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
       AudioService.stopRingtone();
     });
   }
-  }
 
   Widget _buildBillingRow(String label, String value) {
     return Padding(
