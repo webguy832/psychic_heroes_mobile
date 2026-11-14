@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/session_provider.dart';
-import 'advisor_detail_screen.dart';
 
 class SessionAfterSummaryScreen extends StatefulWidget {
   final bool isAdvisorView;
@@ -58,38 +57,20 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
       } else {
         timer.cancel();
         _redirectTimer = null;
-        _returnToDashboardOrAdvisor();
+        _returnToDashboard();
       }
     });
   }
 
-  void _returnToDashboardOrAdvisor() {
+  void _returnToDashboard() {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
     _redirectTimer?.cancel();
     _redirectTimer = null;
     final sessionProv = Provider.of<SessionProvider>(context, listen: false);
-    final advId = widget.advisorId ?? sessionProv.activeRequest?.advisorId;
     sessionProv.resetSession();
-
-    if (widget.isAdvisorView) {
-      // Advisor goes back to Advisor Dashboard
-      Navigator.popUntil(context, (route) => route.isFirst);
-    } else {
-      // User goes back to the Advisor detail profile page
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      } else if (advId != null && advId.isNotEmpty) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AdvisorDetailScreen(advisorId: advId),
-          ),
-        );
-      } else {
-        Navigator.popUntil(context, (route) => route.isFirst);
-      }
-    }
+    // Return to root dashboard (Advisor Dashboard for advisors, Customer Home for users)
+    Navigator.popUntil(context, (route) => route.isFirst);
   }
 
   @override
@@ -102,6 +83,9 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+    final summary = sessionProv.chatSummary;
+
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
@@ -115,7 +99,7 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.close_rounded, color: Colors.white70),
-            onPressed: _returnToDashboardOrAdvisor,
+            onPressed: _returnToDashboard,
           ),
         ],
       ),
@@ -151,41 +135,58 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
               textAlign: TextAlign.center,
             ),
 
-            // Prominent Top Timer Countdown Notice (Immediately visible on mobile without scrolling!)
-            if (widget.isLiveSessionEnd && _redirectSeconds > 0) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                decoration: BoxDecoration(
-                  color: AppColors.accentGold.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.accentGold.withOpacity(0.4), width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentGold),
+            // Free Minutes Status Banner on User Side (Matching Angular Web App Parity)
+            if (!widget.isAdvisorView && summary != null) ...[
+              if (summary['freeMinutesOver'] == true ||
+                  ((summary['chargedAmount'] ?? 0) is num &&
+                      (summary['chargedAmount'] ?? 0) > 0 &&
+                      (summary['remainingFreeMinutes'] == null ||
+                          ((summary['remainingFreeMinutes'] ?? 0) is num &&
+                              (summary['remainingFreeMinutes'] ?? 0) <= 0)))) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.timer_off_outlined, color: Colors.amber, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        "Your free minutes are over",
+                        style: TextStyle(color: Colors.amber, fontSize: 13, fontWeight: FontWeight.bold),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      widget.isAdvisorView
-                          ? "Redirecting to dashboard in $_redirectSeconds seconds..."
-                          : "Redirecting to ${widget.participantName} in $_redirectSeconds seconds...",
-                      style: const TextStyle(
-                        color: AppColors.accentGold,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ] else if (summary['remainingFreeMinutes'] != null &&
+                  summary['remainingFreeMinutes'] is num &&
+                  summary['remainingFreeMinutes'] > 0) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.onlineGreen.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.onlineGreen.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.card_giftcard_rounded, color: AppColors.onlineGreen, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Free Minutes Remaining: ${summary['remainingFreeMinutes']} Mins",
+                        style: const TextStyle(color: AppColors.onlineGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
 
             const SizedBox(height: 20),
@@ -206,7 +207,12 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
                   const Divider(color: AppColors.borderDark, height: 24),
                   _buildSummaryRow("Total Duration", widget.formattedTime, icon: Icons.timer_rounded, valueColor: AppColors.accentGold),
                   const Divider(color: AppColors.borderDark, height: 24),
-                  _buildSummaryRow("Total Charges", widget.totalCost == 0 ? "FREE (\$0.00)" : "\$${widget.totalCost.toStringAsFixed(2)}", icon: Icons.payments_rounded, valueColor: AppColors.onlineGreen),
+                  _buildSummaryRow(
+                    widget.isAdvisorView ? "Total Earnings" : "Total Charges",
+                    widget.totalCost == 0 ? "FREE (\$0.00)" : "\$${widget.totalCost.toStringAsFixed(2)}",
+                    icon: Icons.payments_rounded,
+                    valueColor: AppColors.onlineGreen,
+                  ),
                 ],
               ),
             ),
@@ -324,7 +330,7 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Auto Redirect Countdown Notice (Bottom)
+            // Single Auto Redirect Countdown Notice (Matching Angular Web App Parity)
             if (widget.isLiveSessionEnd && _redirectSeconds > 0) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 14),
@@ -348,9 +354,7 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      widget.isAdvisorView
-                          ? "Redirecting to dashboard in $_redirectSeconds seconds..."
-                          : "Redirecting to ${widget.participantName} in $_redirectSeconds seconds...",
+                      "Redirecting to dashboard in $_redirectSeconds seconds...",
                       style: const TextStyle(
                         color: AppColors.accentGold,
                         fontSize: 13,
@@ -362,7 +366,7 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
               ),
             ],
 
-            // Back to Dashboard / Advisor Button
+            // Back to Dashboard Button (Identical for both Advisor and Customer, matching Web App parity)
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -371,17 +375,15 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                icon: Icon(
-                  widget.isAdvisorView ? Icons.dashboard_rounded : Icons.person_rounded,
+                icon: const Icon(
+                  Icons.dashboard_rounded,
                   color: Colors.white,
                 ),
-                label: Text(
-                  widget.isAdvisorView
-                      ? "Go To Dashboard"
-                      : "Return to ${widget.participantName}",
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                label: const Text(
+                  "Go To Dashboard",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                onPressed: _returnToDashboardOrAdvisor,
+                onPressed: _returnToDashboard,
               ),
             ),
             const SizedBox(height: 20),
