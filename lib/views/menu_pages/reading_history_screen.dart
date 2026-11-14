@@ -200,6 +200,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                                                     formattedTime: item.duration,
                                                     totalCost: item.cost,
                                                     sessionTypeLabel: item.type,
+                                                    isLiveSessionEnd: false,
                                                   ),
                                                 ),
                                               );

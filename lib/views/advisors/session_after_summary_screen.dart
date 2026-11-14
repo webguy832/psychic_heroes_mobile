@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -9,6 +10,7 @@ class SessionAfterSummaryScreen extends StatefulWidget {
   final String formattedTime;
   final double totalCost;
   final String sessionTypeLabel;
+  final bool isLiveSessionEnd;
 
   const SessionAfterSummaryScreen({
     Key? key,
@@ -17,6 +19,7 @@ class SessionAfterSummaryScreen extends StatefulWidget {
     required this.formattedTime,
     required this.totalCost,
     required this.sessionTypeLabel,
+    this.isLiveSessionEnd = true,
   }) : super(key: key);
 
   @override
@@ -27,9 +30,50 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
   int _selectedRating = 5;
   final TextEditingController _reviewController = TextEditingController();
   bool _reviewSubmitted = false;
+  int _redirectSeconds = 10;
+  Timer? _redirectTimer;
+  bool _hasNavigated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isLiveSessionEnd) {
+      _startRedirectTimer();
+    }
+  }
+
+  void _startRedirectTimer() {
+    _redirectTimer?.cancel();
+    _redirectTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        _redirectTimer = null;
+        return;
+      }
+      if (_redirectSeconds > 1) {
+        setState(() => _redirectSeconds--);
+      } else {
+        timer.cancel();
+        _redirectTimer = null;
+        _returnToDashboardOrHome();
+      }
+    });
+  }
+
+  void _returnToDashboardOrHome() {
+    if (_hasNavigated || !mounted) return;
+    _hasNavigated = true;
+    _redirectTimer?.cancel();
+    _redirectTimer = null;
+    final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+    sessionProv.resetSession();
+    Navigator.popUntil(context, (route) => route.isFirst);
+  }
 
   @override
   void dispose() {
+    _redirectTimer?.cancel();
+    _redirectTimer = null;
     _reviewController.dispose();
     super.dispose();
   }
@@ -51,10 +95,7 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.close_rounded, color: Colors.white70),
-            onPressed: () {
-              sessionProv.resetSession();
-              Navigator.popUntil(context, (route) => route.isFirst);
-            },
+            onPressed: _returnToDashboardOrHome,
           ),
         ],
       ),
@@ -161,6 +202,14 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
                         controller: _reviewController,
                         style: const TextStyle(color: Colors.white, fontSize: 13),
                         maxLines: 3,
+                        onChanged: (text) {
+                          // Pause auto-redirect if customer is actively typing a review
+                          if (text.trim().isNotEmpty && _redirectTimer != null) {
+                            _redirectTimer?.cancel();
+                            _redirectTimer = null;
+                            if (mounted) setState(() => _redirectSeconds = 0);
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: "Write your review or feedback (optional)...",
                           hintStyle: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12),
@@ -182,7 +231,11 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: () {
-                            setState(() => _reviewSubmitted = true);
+                            setState(() {
+                              _reviewSubmitted = true;
+                              _redirectSeconds = 3;
+                            });
+                            _startRedirectTimer();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text("Thank you! Your review has been submitted.")),
                             );
@@ -214,7 +267,45 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Back to Home Button
+            // Auto Redirect Countdown Notice (Matching Angular Web App Parity)
+            if (widget.isLiveSessionEnd && _redirectSeconds > 0) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accentGold.withOpacity(0.35)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentGold),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      widget.isAdvisorView
+                          ? "Redirecting to dashboard in $_redirectSeconds seconds..."
+                          : "Redirecting to home in $_redirectSeconds seconds...",
+                      style: const TextStyle(
+                        color: AppColors.accentGold,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Back to Dashboard / Home Button
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -223,15 +314,15 @@ class _SessionAfterSummaryScreenState extends State<SessionAfterSummaryScreen> {
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                icon: const Icon(Icons.home_rounded, color: Colors.white),
-                label: const Text(
-                  "Return to Home",
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                icon: Icon(
+                  widget.isAdvisorView ? Icons.dashboard_rounded : Icons.home_rounded,
+                  color: Colors.white,
                 ),
-                onPressed: () {
-                  sessionProv.resetSession();
-                  Navigator.popUntil(context, (route) => route.isFirst);
-                },
+                label: Text(
+                  widget.isAdvisorView ? "Go To Dashboard" : "Return to Home",
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                onPressed: _returnToDashboardOrHome,
               ),
             ),
             const SizedBox(height: 20),
