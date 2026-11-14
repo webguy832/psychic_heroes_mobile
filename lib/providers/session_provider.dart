@@ -467,7 +467,7 @@ class SessionProvider extends ChangeNotifier {
     if (!_isAdvisorOnline) return;
 
     // Suppress incoming requests if advisor is currently in an active or on-hold session
-    if (_sessionState == SessionState.active || _sessionState == SessionState.hold) return;
+    if (_sessionState == SessionState.active || _sessionState == SessionState.hold || _activeRequest != null) return;
 
     // Avoid duplicate or already handled requests
     if (_handledRequestIds.contains(req.requestId)) return;
@@ -566,6 +566,15 @@ class SessionProvider extends ChangeNotifier {
     if (_activeRequest != null && reqId != null && reqId.isNotEmpty && _activeRequest!.id != reqId) {
       return;
     }
+
+    // If session was already active and opponent cancelled/hung up, end session cleanly (parity with Angular onRemoteEnded)
+    if (_sessionState == SessionState.active || _sessionState == SessionState.hold) {
+      _stopAllTimers();
+      _sessionState = SessionState.ended;
+      notifyListeners();
+      return;
+    }
+
     if (_sessionState == SessionState.waitingForAdvisor ||
         (_activeRequest != null && (reqId == null || reqId.isEmpty || _activeRequest!.id == reqId))) {
       _waitingTimer?.cancel();
@@ -920,10 +929,10 @@ class SessionProvider extends ChangeNotifier {
 
   Future<void> _pollAdvisorRequestsOnce(String advisorProfileId, String advisorName) async {
     if (!_isAdvisorOnline) return;
-    if (_sessionState == SessionState.active || _sessionState == SessionState.hold) return;
+    if (_sessionState == SessionState.active || _sessionState == SessionState.hold || _activeRequest != null) return;
     try {
       final requests = await _chatService.getChatRequests(advisorProfileId);
-      if (_sessionState == SessionState.active || _sessionState == SessionState.hold) return;
+      if (_sessionState == SessionState.active || _sessionState == SessionState.hold || _activeRequest != null) return;
       if (requests.isNotEmpty) {
         bool changed = false;
         for (var r in requests) {
@@ -1063,6 +1072,12 @@ class SessionProvider extends ChangeNotifier {
   Future<void> declineSessionRequest(SessionRequestItem req) async {
     _handledRequestIds.add(req.id);
     _incomingRequests.removeWhere((r) => r.id == req.id);
+
+    // If session is already active with this request, do not cancel the active session!
+    if (_sessionState == SessionState.active && _activeRequest?.id == req.id) {
+      return;
+    }
+
     await _chatService.cancelChat(req.id);
     if (_activeRequest?.id == req.id) {
       _activeRequest = null;

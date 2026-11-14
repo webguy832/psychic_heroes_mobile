@@ -44,8 +44,17 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   }
 
   void _checkAndShowIncomingRequestDialog(BuildContext context, SessionProvider sessionProv) {
+    // If this screen is NOT the topmost active route, NEVER show incoming request dialogs!
+    // (Prevents dialogs popping up over LiveSessionScreen, VideoCallScreen, VoiceCallScreen, etc.)
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      return;
+    }
+
     // If advisor is currently in an active or on-hold session, NEVER show incoming request dialogs
-    if (sessionProv.sessionState == SessionState.active || sessionProv.sessionState == SessionState.hold) {
+    if (sessionProv.sessionState == SessionState.active ||
+        sessionProv.sessionState == SessionState.hold ||
+        sessionProv.activeRequest != null) {
       return;
     }
 
@@ -62,7 +71,12 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
     _currentShowingDialogRequestId = req.id;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || sessionProv.sessionState == SessionState.active || sessionProv.sessionState == SessionState.hold) {
+      final currentRoute = ModalRoute.of(context);
+      if (!mounted ||
+          (currentRoute != null && !currentRoute.isCurrent) ||
+          sessionProv.sessionState == SessionState.active ||
+          sessionProv.sessionState == SessionState.hold ||
+          sessionProv.activeRequest != null) {
         _isDialogShowing = false;
         _currentShowingDialogRequestId = null;
         return;
@@ -75,7 +89,11 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           return _IncomingRequestDialogModal(
             req: req,
             onAccept: () async {
-              Navigator.of(dialogCtx).pop();
+              _isDialogShowing = false;
+              _currentShowingDialogRequestId = null;
+              if (Navigator.of(dialogCtx).canPop()) {
+                Navigator.of(dialogCtx).pop();
+              }
               Widget targetScreen = const LiveSessionScreen(isAdvisorView: true);
               if (req.type == SessionType.video) {
                 targetScreen = const VideoCallScreen(isAdvisorView: true);
@@ -97,15 +115,17 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               await acceptFuture;
             },
             onDecline: (r) {
-              Navigator.of(dialogCtx).pop();
               _isDialogShowing = false;
               _currentShowingDialogRequestId = null;
+              if (Navigator.of(dialogCtx).canPop()) {
+                Navigator.of(dialogCtx).pop();
+              }
               sessionProv.declineSessionRequest(r);
             },
           );
         },
       ).then((_) {
-        if (mounted && sessionProv.sessionState != SessionState.active) {
+        if (mounted && sessionProv.sessionState != SessionState.active && sessionProv.sessionState != SessionState.hold) {
           _isDialogShowing = false;
           _currentShowingDialogRequestId = null;
         }
@@ -570,7 +590,7 @@ class _IncomingRequestDialogModal extends StatefulWidget {
 }
 
 class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal> {
-  int _remainingSeconds = 15;
+  int _remainingSeconds = 60; // 60s parity with Angular expiresInSeconds || 60
   Timer? _timer;
   bool _actionTaken = false;
   String _selectedReason = "Busy";
@@ -582,13 +602,34 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        _timer = null;
+        return;
+      }
+      final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+      if (sessionProv.sessionState == SessionState.active ||
+          sessionProv.sessionState == SessionState.hold ||
+          sessionProv.activeRequest?.id == widget.req.id) {
+        timer.cancel();
+        _timer = null;
+        _actionTaken = true;
+        return;
+      }
+      if (_actionTaken) {
+        timer.cancel();
+        _timer = null;
+        return;
+      }
       if (_remainingSeconds > 1) {
         if (mounted) {
           setState(() => _remainingSeconds--);
         }
       } else {
         timer.cancel();
+        _timer = null;
         if (!_actionTaken && mounted) {
           _actionTaken = true;
           widget.onDecline(widget.req);
@@ -600,6 +641,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
   @override
   void dispose() {
     _timer?.cancel();
+    _timer = null;
     super.dispose();
   }
 
@@ -626,7 +668,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                   width: 70,
                   height: 70,
                   child: CircularProgressIndicator(
-                    value: _remainingSeconds / 15,
+                    value: _remainingSeconds / 60,
                     strokeWidth: 4,
                     valueColor: const AlwaysStoppedAnimation<Color>(AppColors.onlineGreen),
                     backgroundColor: Colors.black12,
@@ -720,6 +762,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                         : () {
                             _actionTaken = true;
                             _timer?.cancel();
+                            _timer = null;
                             widget.onDecline(widget.req);
                           },
                     child: const Text("REJECT", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.ctaGreen)),
@@ -746,6 +789,7 @@ class _IncomingRequestDialogModalState extends State<_IncomingRequestDialogModal
                           : () {
                               _actionTaken = true;
                               _timer?.cancel();
+                              _timer = null;
                               widget.onAccept();
                             },
                       child: const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
