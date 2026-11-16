@@ -276,11 +276,35 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<void> fetchNotifications() async {
+    _isLoading = true;
+    notifyListeners();
     try {
-      _notifications = await _userService.getNotifications();
-      notifyListeners();
+      _notifications = await _userService.getNotifications(isAdvisor: isAdvisor);
     } catch (e) {
       _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> markNotificationAsRead(int id) async {
+    final success = await _userService.markNotificationAsRead(id, isAdvisor: isAdvisor);
+    if (success) {
+      _notifications = _notifications.map((n) {
+        if (n.id == id) {
+          return n.copyWith(isRead: true);
+        }
+        return n;
+      }).toList();
+      notifyListeners();
+    }
+  }
+
+  Future<void> markAllNotificationsAsRead() async {
+    final success = await _userService.readAllNotifications(isAdvisor: isAdvisor);
+    if (success) {
+      _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
       notifyListeners();
     }
   }

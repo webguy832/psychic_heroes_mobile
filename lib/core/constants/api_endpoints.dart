@@ -47,6 +47,9 @@ class ApiEndpoints {
   static const String pendingNotifications = "api/User/pending-Notifications";
   static String markNotificationRead(int id) => "api/User/notifications/$id/read";
   static const String readAllNotifications = "api/User/notifications/read-all";
+  static const String advisorNotifications = "api/advisor/dashboard/notifications";
+  static String markAdvisorNotificationRead(int id) => "api/advisor/dashboard/notifications/$id/read";
+  static const String readAllAdvisorNotifications = "api/advisor/dashboard/notifications/read-all";
   
   // Billing Endpoints
   static const String getBillingAddresses = "api/UserBillingAddress/GetAllByUser";

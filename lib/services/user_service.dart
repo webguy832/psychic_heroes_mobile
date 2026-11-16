@@ -181,26 +181,84 @@ class UserService {
     }
   }
 
-  Future<List<NotificationDto>> getNotifications() async {
+  Future<List<NotificationDto>> getNotifications({bool isAdvisor = false}) async {
     final token = await StorageService.getToken();
     if (token == null || token.isEmpty) return [];
+
+    if (isAdvisor) {
+      try {
+        final response = await ApiClient.get(ApiEndpoints.advisorNotifications);
+        final list = (response is List)
+            ? response
+            : (response is Map && response['data'] is List ? response['data'] : null);
+        if (list != null) {
+          return list.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await ApiClient.get(ApiEndpoints.userNotifications);
-      if (response is List) {
-        return response.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
+      final list = (response is List)
+          ? response
+          : (response is Map && response['data'] is List ? response['data'] : null);
+      if (list != null) {
+        return list.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (_) {
+      // Fallback to advisor notifications if customer endpoint returns 403 or error
+      try {
+        final response = await ApiClient.get(ApiEndpoints.advisorNotifications);
+        final list = (response is List)
+            ? response
+            : (response is Map && response['data'] is List ? response['data'] : null);
+        if (list != null) {
+          return list.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
       return [];
     }
   }
 
-  Future<void> markNotificationAsRead(int id) async {
-    await ApiClient.post(ApiEndpoints.markNotificationRead(id));
+  Future<bool> markNotificationAsRead(int id, {bool isAdvisor = false}) async {
+    try {
+      if (isAdvisor) {
+        await ApiClient.post(ApiEndpoints.markAdvisorNotificationRead(id));
+        return true;
+      }
+      await ApiClient.post(ApiEndpoints.markNotificationRead(id));
+      return true;
+    } catch (_) {
+      try {
+        await ApiClient.post(isAdvisor
+            ? ApiEndpoints.markNotificationRead(id)
+            : ApiEndpoints.markAdvisorNotificationRead(id));
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
   }
 
-  Future<void> readAllNotifications() async {
-    await ApiClient.post(ApiEndpoints.readAllNotifications);
+  Future<bool> readAllNotifications({bool isAdvisor = false}) async {
+    try {
+      if (isAdvisor) {
+        await ApiClient.post(ApiEndpoints.readAllAdvisorNotifications);
+        return true;
+      }
+      await ApiClient.post(ApiEndpoints.readAllNotifications);
+      return true;
+    } catch (_) {
+      try {
+        await ApiClient.post(isAdvisor
+            ? ApiEndpoints.readAllNotifications
+            : ApiEndpoints.readAllAdvisorNotifications);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
   }
 
   Future<List<BillingAddressDto>> getBillingAddresses() async {
