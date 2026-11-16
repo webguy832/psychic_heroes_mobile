@@ -12,6 +12,7 @@ class UserProvider extends ChangeNotifier {
 
   UserModel? _user;
   String? _advisorProfileId;
+  UserWalletSummary? _walletSummary;
   List<BillingAddressDto> _billingAddresses = [];
   List<NotificationDto> _notifications = [];
   List<TransactionHistoryDto> _transactions = [];
@@ -21,6 +22,7 @@ class UserProvider extends ChangeNotifier {
 
   UserModel? get user => _user;
   String? get advisorProfileId => _advisorProfileId;
+  UserWalletSummary? get walletSummary => _walletSummary;
   List<BillingAddressDto> get billingAddresses => _billingAddresses;
   List<NotificationDto> get notifications => _notifications;
   List<TransactionHistoryDto> get transactions => _transactions;
@@ -28,8 +30,8 @@ class UserProvider extends ChangeNotifier {
   int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  double get userBalance => _user?.walletBalance ?? 0.0;
-  int get freeMinutes => _user?.freeMinutes ?? 0;
+  double get userBalance => _walletSummary?.balance ?? _user?.walletBalance ?? 0.0;
+  int get freeMinutes => _walletSummary != null ? _walletSummary!.minBalance.toInt() : (_user?.freeMinutes ?? 0);
   int get karmaPoints => _user?.karmaPoints ?? 0;
   int get currentStreak => _user?.streakCount ?? 1;
   String get tierLevel => _user?.tierLevel ?? "Member";
@@ -54,6 +56,7 @@ class UserProvider extends ChangeNotifier {
   void clearUser() {
     _user = null;
     _advisorProfileId = null;
+    _walletSummary = null;
     _billingAddresses = [];
     _notifications = [];
     _transactions = [];
@@ -194,6 +197,48 @@ class UserProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> fetchWalletSummary() async {
+    try {
+      _walletSummary = await _userService.getWalletSummary();
+      if (_walletSummary != null && _user != null) {
+        _user = _user!.copyWith(
+          walletBalance: _walletSummary!.balance,
+          freeMinutes: _walletSummary!.minBalance.toInt(),
+        );
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("fetchWalletSummary error: $e");
+    }
+  }
+
+  Future<void> loadWalletData() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final results = await Future.wait([
+        _userService.getWalletSummary(),
+        _userService.getTransactions(),
+      ]);
+      _walletSummary = results[0] as UserWalletSummary?;
+      _transactions = results[1] as List<TransactionHistoryDto>;
+
+      if (_walletSummary != null && _user != null) {
+        _user = _user!.copyWith(
+          walletBalance: _walletSummary!.balance,
+          freeMinutes: _walletSummary!.minBalance.toInt(),
+        );
+      }
+    } catch (e) {
+      _errorMessage = "Failed to load wallet details";
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_styles.dart';
+import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
-import 'add_funds_screen.dart';
 import '../shared/app_footer_widget.dart';
+import 'add_funds_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({Key? key}) : super(key: key);
@@ -14,234 +15,595 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  String _selectedFilter = "all";
+  String _selectedFilter = "all"; // "all", "credits", "debits"
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userProv = Provider.of<UserProvider>(context, listen: false);
-      userProv.fetchUserProfile();
-      userProv.fetchTransactions();
+      _loadData();
     });
+  }
+
+  void _loadData() {
+    final userProv = Provider.of<UserProvider>(context, listen: false);
+    userProv.loadWalletData();
+  }
+
+  String _formatDate(String rawDate) {
+    if (rawDate.isEmpty) return '—';
+    try {
+      final dt = DateTime.parse(rawDate).toLocal();
+      return DateFormat('dd MMM, hh:mm a').format(dt);
+    } catch (_) {
+      return rawDate;
+    }
+  }
+
+  String _formatUpdatedDate(String rawDate) {
+    if (rawDate.isEmpty) return 'Just now';
+    try {
+      final dt = DateTime.parse(rawDate).toLocal();
+      return DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+    } catch (_) {
+      return rawDate;
+    }
+  }
+
+  bool _isFreeFee(TransactionHistoryDto t) {
+    final tt = t.transType.trim().toLowerCase();
+    return tt == '5' ||
+        tt == '6' ||
+        tt == 'chatfee' ||
+        tt == 'callingfee' ||
+        t.description.contains('\$0.00') ||
+        t.description.toLowerCase().contains('free');
   }
 
   @override
   Widget build(BuildContext context) {
     final userProv = Provider.of<UserProvider>(context);
-    final transactions = userProv.transactions;
+    final summary = userProv.walletSummary ??
+        UserWalletSummary(
+          balance: userProv.userBalance,
+          minBalance: userProv.freeMinutes.toDouble(),
+          ratePerMin: 0.0,
+          updatedAt: DateTime.now().toIso8601String(),
+        );
 
-    final filteredTransactions = transactions.where((t) {
-      if (_selectedFilter == "credits") return t.type == 'credit';
-      if (_selectedFilter == "debits") return t.type == 'debit';
+    final rawMinBalance = summary.minBalance;
+    final freeMinutesOver = rawMinBalance <= 0;
+
+    final allTxns = userProv.transactions;
+    final filteredTxns = allTxns.where((t) {
+      if (_selectedFilter == "credits") return t.credit > 0;
+      if (_selectedFilter == "debits") return t.debit > 0 || _isFreeFee(t);
       return true;
     }).toList();
 
+    final isLoading = userProv.isLoading && userProv.walletSummary == null;
+
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC), // Matching web slate-50/slate-100 background
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
-        title: const Text("My Wallet & Transaction History", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        title: const Text(
+          "My Wallet & Transaction History",
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: "Refresh Wallet",
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF475569)),
+            onPressed: _loadData,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: AppStyles.paddingPage,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Wallet Header Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.cardGradient,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.borderGold.withOpacity(0.5)),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.accentGold.withOpacity(0.18), blurRadius: 16, offset: const Offset(0, 4)),
-                      ],
-                    ),
+      body: RefreshIndicator(
+        onRefresh: () async => _loadData(),
+        color: const Color(0xFF4F46E5),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1240),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("Available Wallet Balance", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.bold)),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.accentGold,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                              label: const Text("Add Funds", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              onPressed: () {
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const AddFundsScreen()));
-                              },
+                        // Optional Error Message
+                        if (userProv.errorMessage != null && userProv.errorMessage!.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFFECACA)),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "\$${userProv.userBalance.toStringAsFixed(2)}",
-                          style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: AppColors.accentGold),
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(color: AppColors.borderDark, height: 1),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
+                            child: Row(
                               children: [
-                                const Icon(Icons.stars_rounded, color: AppColors.accentCyan, size: 20),
-                                const SizedBox(width: 8),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text("Karma Rewards", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 10)),
-                                    Text("${userProv.karmaPoints} Points Available", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  ],
+                                const Icon(Icons.error_outline_rounded, color: Color(0xFFB91C1C), size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    userProv.errorMessage!,
+                                    style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
                                 ),
                               ],
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                              child: const Text("ACTIVE WALLET", style: TextStyle(color: AppColors.onlineGreen, fontSize: 10, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
+                          ),
+
+                        // TOP SUMMARY CARDS (Matching web_angular_2025 wallet.component.html)
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isWide = constraints.maxWidth >= 768;
+
+                            final card1 = _buildCurrentBalanceCard(summary);
+                            final card2 = _buildFreeMinutesCard(rawMinBalance, freeMinutesOver);
+                            final card3 = _buildRateCard(summary);
+
+                            if (isWide) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: card1),
+                                  const SizedBox(width: 16),
+                                  Expanded(child: card2),
+                                  const SizedBox(width: 16),
+                                  Expanded(child: card3),
+                                ],
+                              );
+                            }
+
+                            return Column(
+                              children: [
+                                card1,
+                                const SizedBox(height: 12),
+                                card2,
+                                const SizedBox(height: 12),
+                                card3,
+                              ],
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // TRANSACTIONS SECTION (Matching web_angular_2025)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.02),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Card Header
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                                child: Column(
+                                  children: [
+                                    RichText(
+                                      text: TextSpan(
+                                        style: GoogleFonts.playfairDisplay(
+                                          fontSize: 24,
+                                          color: const Color(0xFF0F172A),
+                                        ),
+                                        children: const [
+                                          TextSpan(text: "Transaction "),
+                                          TextSpan(
+                                            text: "History",
+                                            style: TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Updated ${_formatUpdatedDate(summary.updatedAt)}",
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                    ),
+                                    const SizedBox(height: 14),
+
+                                    // Filter Tabs
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      alignment: WrapAlignment.center,
+                                      children: [
+                                        _buildFilterChip("all", "All Activity (${allTxns.length})"),
+                                        _buildFilterChip("credits", "Credits"),
+                                        _buildFilterChip("debits", "Debits"),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                              // Body: Loading / Empty / Data Table
+                              if (isLoading)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 60),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF4F46E5),
+                                      strokeWidth: 3,
+                                    ),
+                                  ),
+                                )
+                              else if (filteredTxns.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 50, horizontal: 20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.receipt_long_outlined, size: 42, color: Color(0xFFCBD5E1)),
+                                      SizedBox(height: 12),
+                                      Text(
+                                        "No transactions found",
+                                        style: TextStyle(
+                                          color: Color(0xFF94A3B8),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else ...[
+                                // Full Web-Table layout with Horizontal Scroll support
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(minWidth: 620),
+                                    child: DataTable(
+                                      headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
+                                      dividerThickness: 1,
+                                      horizontalMargin: 20,
+                                      columnSpacing: 24,
+                                      headingTextStyle: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                      columns: const [
+                                        DataColumn(label: Text("Date")),
+                                        DataColumn(label: Text("Description")),
+                                        DataColumn(label: Text("Credit"), numeric: true),
+                                        DataColumn(label: Text("Debit"), numeric: true),
+                                        DataColumn(label: Text("Balance"), numeric: true),
+                                      ],
+                                      rows: filteredTxns.map((t) {
+                                        final isCredit = t.credit > 0;
+                                        final isDebit = t.debit > 0;
+                                        final isFree = _isFreeFee(t);
+
+                                        return DataRow(
+                                          cells: [
+                                            // Date
+                                            DataCell(
+                                              Text(
+                                                _formatDate(t.createdAt),
+                                                style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                                              ),
+                                            ),
+
+                                            // Description
+                                            DataCell(
+                                              Container(
+                                                constraints: const BoxConstraints(maxWidth: 240),
+                                                child: Text(
+                                                  t.description.isNotEmpty ? t.description : 'Reading Session',
+                                                  style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 2,
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Credit
+                                            DataCell(
+                                              Text(
+                                                isCredit ? "\$ ${t.credit.toStringAsFixed(2)}" : "—",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isCredit ? const Color(0xFF15803D) : const Color(0xFF94A3B8),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Debit
+                                            DataCell(
+                                              Text(
+                                                isDebit
+                                                    ? "\$ ${t.debit.toStringAsFixed(2)}"
+                                                    : (isFree ? "\$ 0.00" : "—"),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDebit
+                                                      ? const Color(0xFFB91C1C)
+                                                      : (isFree ? const Color(0xFFD97706) : const Color(0xFF94A3B8)),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Running Balance
+                                            DataCell(
+                                              Text(
+                                                "\$ ${t.balance.toStringAsFixed(2)}",
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF334155),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // Transaction History Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Transaction History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                      DropdownButton<String>(
-                        value: _selectedFilter,
-                        dropdownColor: AppColors.bgDarkCard,
-                        style: const TextStyle(color: AppColors.accentGold, fontSize: 12, fontWeight: FontWeight.bold),
-                        underline: const SizedBox(),
-                        items: const [
-                          DropdownMenuItem(value: "all", child: Text("All Activity")),
-                          DropdownMenuItem(value: "credits", child: Text("Recharges / Bonus")),
-                          DropdownMenuItem(value: "debits", child: Text("Session Charges")),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setState(() => _selectedFilter = val);
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Transactions List
-                  if (filteredTransactions.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgDarkCard,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.borderDark),
-                      ),
-                      child: Column(
-                        children: const [
-                          Icon(Icons.receipt_long_outlined, size: 40, color: AppColors.textSecondaryDark),
-                          SizedBox(height: 8),
-                          Text("No transactions found", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)),
-                        ],
-                      ),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredTransactions.length,
-                      itemBuilder: (ctx, i) {
-                        final txn = filteredTransactions[i];
-                        final isCredit = txn.type == 'credit';
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgDarkCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.borderDark),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: isCredit ? AppColors.onlineGreen.withOpacity(0.15) : AppColors.errorRed.withOpacity(0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isCredit ? Icons.add_card_rounded : Icons.forum_rounded,
-                                  color: isCredit ? AppColors.onlineGreen : AppColors.errorRed,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(txn.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
-                                    const SizedBox(height: 2),
-                                    Text("${txn.id} • ${txn.date}", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    "${isCredit ? '+' : '-'}\$${txn.amount.toStringAsFixed(2)}",
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: isCredit ? AppColors.onlineGreen : AppColors.errorRed,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white10,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(txn.status, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 9)),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
+                ),
               ),
+              const SizedBox(height: 24),
+              const AppFooterWidget(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Card 1: Current Balance
+  Widget _buildCurrentBalanceCard(UserWalletSummary summary) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.white, Color(0xFFF8FAFC)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Current Balance",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5), // Indigo matching web action
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                label: const Text(
+                  "Add Funds",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddFundsScreen()),
+                  ).then((_) => _loadData());
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "\$ ${summary.balance.toStringAsFixed(2)}",
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.5,
             ),
-            const AppFooterWidget(),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Card 2: Free Minutes Balance (Active / Over)
+  Widget _buildFreeMinutesCard(double rawMinBalance, bool isOver) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Free Minutes Balance",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: !isOver ? const Color(0xFFD1FAE5) : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: !isOver ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
+                  ),
+                ),
+                child: Text(
+                  !isOver ? "Active" : "Over",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: !isOver ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "${rawMinBalance.toStringAsFixed(rawMinBalance.truncateToDouble() == rawMinBalance ? 0 : 1)} Mins",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: !isOver ? const Color(0xFF047857) : const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            !isOver ? "Available for your reading sessions" : "Your free minutes are over",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isOver ? FontWeight.w600 : FontWeight.normal,
+              color: !isOver ? const Color(0xFF64748B) : const Color(0xFFB45309),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Card 3: Rate / Min
+  Widget _buildRateCard(UserWalletSummary summary) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Rate / Min",
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "\$ ${summary.ratePerMin.toStringAsFixed(2)}",
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Default per-minute service rate",
+            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Filter Chip Widget
+  Widget _buildFilterChip(String value, String label) {
+    final isSelected = _selectedFilter == value;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedFilter = value;
+        });
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
         ),
       ),
     );
   }
 }
-

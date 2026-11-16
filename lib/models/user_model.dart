@@ -211,57 +211,93 @@ class UserModel {
   }
 }
 
+class UserWalletSummary {
+  final double balance;
+  final double minBalance;
+  final double ratePerMin;
+  final String updatedAt;
+
+  UserWalletSummary({
+    required this.balance,
+    required this.minBalance,
+    required this.ratePerMin,
+    required this.updatedAt,
+  });
+
+  factory UserWalletSummary.fromJson(Map<String, dynamic> json) {
+    final rawBal = json['balance'] ?? json['Balance'] ?? 0;
+    final rawMin = json['minBalance'] ?? json['MinBalance'] ?? json['minsBalance'] ?? json['MinsBalance'] ?? 0;
+    final rawRate = json['ratePerMin'] ?? json['RatePerMin'] ?? 0;
+
+    return UserWalletSummary(
+      balance: (rawBal is num) ? rawBal.toDouble() : double.tryParse(rawBal.toString()) ?? 0.0,
+      minBalance: (rawMin is num) ? rawMin.toDouble() : double.tryParse(rawMin.toString()) ?? 0.0,
+      ratePerMin: (rawRate is num) ? rawRate.toDouble() : double.tryParse(rawRate.toString()) ?? 0.0,
+      updatedAt: json['updatedAt']?.toString() ?? json['UpdatedAt']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'balance': balance,
+        'minBalance': minBalance,
+        'ratePerMin': ratePerMin,
+        'updatedAt': updatedAt,
+      };
+}
+
 class TransactionHistoryDto {
   final String id;
   final String transactionId;
-  final String title;
+  final String transType;
   final String description;
-  final String transactionType;
-  final String type;
-  final double amount;
   final double credit;
   final double debit;
   final double balance;
   final double minsBalance;
-  final String status;
   final String createdAt;
-  final String date;
+  final String? invoiceId;
+  final String? externalTransactionId;
 
-  String get transType => transactionType;
+  // Backward compatibility getters
+  String get title => description.isNotEmpty ? description : 'Transaction';
+  String get transactionType => transType;
+  String get type => credit > 0 ? 'credit' : 'debit';
+  double get amount => credit > 0 ? credit : debit;
+  String get date => createdAt;
+  String get status => 'Completed';
 
   TransactionHistoryDto({
     required this.id,
     required this.transactionId,
-    required this.title,
+    required this.transType,
     required this.description,
-    required this.transactionType,
-    required this.type,
-    required this.amount,
     required this.credit,
     required this.debit,
     required this.balance,
     required this.minsBalance,
-    required this.status,
     required this.createdAt,
-    required this.date,
+    this.invoiceId,
+    this.externalTransactionId,
   });
 
   factory TransactionHistoryDto.fromJson(Map<String, dynamic> json) {
+    final rawCredit = json['credit'] ?? json['Credit'] ?? 0;
+    final rawDebit = json['debit'] ?? json['Debit'] ?? 0;
+    final rawBalance = json['balance'] ?? json['Balance'] ?? 0;
+    final rawMins = json['minsBalance'] ?? json['MinsBalance'] ?? 0;
+
     return TransactionHistoryDto(
-      id: json['id']?.toString() ?? json['transactionId']?.toString() ?? 'TXN-1',
+      id: json['transactionId']?.toString() ?? json['transId']?.toString() ?? json['id']?.toString() ?? 'TXN-1',
       transactionId: json['transactionId']?.toString() ?? json['transId']?.toString() ?? '',
-      title: json['title'] ?? json['description'] ?? 'Transaction',
-      description: json['description'] ?? json['title'] ?? '',
-      transactionType: json['transactionType'] ?? (json['type'] == 'credit' ? 'Credit' : 'Debit'),
-      type: json['type'] ?? 'debit',
-      amount: (json['amount'] ?? json['debit'] ?? json['credit'] ?? 0).toDouble(),
-      credit: (json['credit'] ?? 0).toDouble(),
-      debit: (json['debit'] ?? 0).toDouble(),
-      balance: (json['balance'] ?? 0).toDouble(),
-      minsBalance: (json['minsBalance'] ?? 0).toDouble(),
-      status: json['status'] ?? 'Completed',
-      createdAt: json['createdAt'] ?? '',
-      date: json['date'] ?? json['createdAt'] ?? '',
+      transType: json['transType']?.toString() ?? json['TransType']?.toString() ?? '',
+      description: json['description']?.toString() ?? json['Description']?.toString() ?? json['title']?.toString() ?? '',
+      credit: (rawCredit is num) ? rawCredit.toDouble() : double.tryParse(rawCredit.toString()) ?? 0.0,
+      debit: (rawDebit is num) ? rawDebit.toDouble() : double.tryParse(rawDebit.toString()) ?? 0.0,
+      balance: (rawBalance is num) ? rawBalance.toDouble() : double.tryParse(rawBalance.toString()) ?? 0.0,
+      minsBalance: (rawMins is num) ? rawMins.toDouble() : double.tryParse(rawMins.toString()) ?? 0.0,
+      createdAt: json['createdAt']?.toString() ?? json['CreatedAt']?.toString() ?? json['date']?.toString() ?? '',
+      invoiceId: json['invoiceId']?.toString() ?? json['InvoiceId']?.toString(),
+      externalTransactionId: json['externalTransactionId']?.toString() ?? json['transactionId2']?.toString() ?? json['TransactionId2']?.toString(),
     );
   }
 }

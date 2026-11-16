@@ -39,6 +39,23 @@ class UserService {
     return (bal as num).toDouble();
   }
 
+  Future<UserWalletSummary?> getWalletSummary() async {
+    final token = await StorageService.getToken();
+    if (token == null || token.isEmpty) return null;
+    try {
+      final response = await ApiClient.get(ApiEndpoints.walletSummary);
+      if (response is Map<String, dynamic>) {
+        final data = response.containsKey('data') && response['data'] is Map<String, dynamic>
+            ? response['data']
+            : response;
+        return UserWalletSummary.fromJson(data as Map<String, dynamic>);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<TransactionHistoryDto>> getTransactions() async {
     final token = await StorageService.getToken();
     if (token == null || token.isEmpty) return [];
@@ -46,6 +63,8 @@ class UserService {
       final response = await ApiClient.get(ApiEndpoints.walletTransactions);
       if (response is List) {
         return response.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+      } else if (response is Map<String, dynamic> && response['data'] is List) {
+        return (response['data'] as List).map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (_) {
