@@ -58,6 +58,13 @@ class ApiEndpoints {
   static const String walletTransactions = "api/dashboard/wallet/transactions";
   static const String readingHistory = "api/customer/history";
 
+  // Advisor Wallet & History Endpoints (Exact matching web_angular_2025 & .NET 8 backend)
+  static const String advisorBookingsHistory = "api/advisor/dashboard/bookings/history";
+  static const String advisorEarningsHistory = "api/advisor/dashboard/earnings/history";
+  static const String advisorWalletSummary = "api/advisor/wallet/summary";
+  static const String advisorWalletTransactions = "api/advisor/wallet/transactions";
+  static const String advisorWithdrawalsHistory = "api/advisor/dashboard/withdrawals/history";
+
   // Packages & Payment Endpoints (Exact matching web_angular_2025)
   static const String getAllPackages = "api/web/GetAllPackages";
   static const String userStatus = "api/user/status";

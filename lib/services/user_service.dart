@@ -39,9 +39,22 @@ class UserService {
     return (bal as num).toDouble();
   }
 
-  Future<UserWalletSummary?> getWalletSummary() async {
+  Future<UserWalletSummary?> getWalletSummary({bool isAdvisor = false}) async {
     final token = await StorageService.getToken();
     if (token == null || token.isEmpty) return null;
+
+    if (isAdvisor) {
+      try {
+        final response = await ApiClient.get(ApiEndpoints.advisorWalletSummary);
+        if (response is Map<String, dynamic>) {
+          final data = response.containsKey('data') && response['data'] is Map<String, dynamic>
+              ? response['data']
+              : response;
+          return UserWalletSummary.fromJson(data as Map<String, dynamic>);
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await ApiClient.get(ApiEndpoints.walletSummary);
       if (response is Map<String, dynamic>) {
@@ -52,13 +65,47 @@ class UserService {
       }
       return null;
     } catch (_) {
+      // If customer wallet summary fails, try advisor wallet summary
+      try {
+        final response = await ApiClient.get(ApiEndpoints.advisorWalletSummary);
+        if (response is Map<String, dynamic>) {
+          final data = response.containsKey('data') && response['data'] is Map<String, dynamic>
+              ? response['data']
+              : response;
+          return UserWalletSummary.fromJson(data as Map<String, dynamic>);
+        }
+      } catch (_) {}
       return null;
     }
   }
 
-  Future<List<TransactionHistoryDto>> getTransactions() async {
+  Future<List<TransactionHistoryDto>> getTransactions({bool isAdvisor = false}) async {
     final token = await StorageService.getToken();
     if (token == null || token.isEmpty) return [];
+
+    if (isAdvisor) {
+      try {
+        final response = await ApiClient.get(ApiEndpoints.advisorWalletTransactions);
+        final list = (response is List)
+            ? response
+            : (response is Map && response['data'] is List ? response['data'] : null);
+        if (list != null && list.isNotEmpty) {
+          return list.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+
+      // Also try earnings history
+      try {
+        final earnResp = await ApiClient.get(ApiEndpoints.advisorEarningsHistory);
+        final list = (earnResp is List)
+            ? earnResp
+            : (earnResp is Map && earnResp['data'] is List ? earnResp['data'] : null);
+        if (list != null && list.isNotEmpty) {
+          return list.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await ApiClient.get(ApiEndpoints.walletTransactions);
       if (response is List) {
@@ -68,20 +115,68 @@ class UserService {
       }
       return [];
     } catch (_) {
+      // If customer transactions fail or unauthorized, fallback to advisor transactions
+      try {
+        final response = await ApiClient.get(ApiEndpoints.advisorWalletTransactions);
+        final list = (response is List)
+            ? response
+            : (response is Map && response['data'] is List ? response['data'] : null);
+        if (list != null && list.isNotEmpty) {
+          return list.map((item) => TransactionHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
       return [];
     }
   }
 
-  Future<List<ReadingHistoryItem>> getReadingHistory() async {
+  Future<List<ReadingHistoryItem>> getReadingHistory({bool isAdvisor = false}) async {
     final token = await StorageService.getToken();
     if (token == null || token.isEmpty) return [];
+
+    if (isAdvisor) {
+      try {
+        final advResp = await ApiClient.get(ApiEndpoints.advisorBookingsHistory);
+        final list = (advResp is List)
+            ? advResp
+            : (advResp is Map && advResp['data'] is List ? advResp['data'] : null);
+        if (list != null && list.isNotEmpty) {
+          return list.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+
+      // If bookings history is empty, check earnings history
+      try {
+        final earnResp = await ApiClient.get(ApiEndpoints.advisorEarningsHistory);
+        final list = (earnResp is List)
+            ? earnResp
+            : (earnResp is Map && earnResp['data'] is List ? earnResp['data'] : null);
+        if (list != null && list.isNotEmpty) {
+          return list.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+      return [];
+    }
+
+    // Customer flow
     try {
       final response = await ApiClient.get(ApiEndpoints.readingHistory);
       if (response is List) {
         return response.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+      } else if (response is Map<String, dynamic> && response['data'] is List) {
+        return (response['data'] as List).map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (_) {
+      // If customer history 403s (e.g. user is logged in as advisor), fallback to advisor history
+      try {
+        final advResp = await ApiClient.get(ApiEndpoints.advisorBookingsHistory);
+        final list = (advResp is List)
+            ? advResp
+            : (advResp is Map && advResp['data'] is List ? advResp['data'] : null);
+        if (list != null && list.isNotEmpty) {
+          return list.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
       return [];
     }
   }

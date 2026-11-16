@@ -63,11 +63,12 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     final userProv = Provider.of<UserProvider>(context);
+    final isAdvisor = userProv.isAdvisor;
     final summary = userProv.walletSummary ??
         UserWalletSummary(
           balance: userProv.userBalance,
           minBalance: userProv.freeMinutes.toDouble(),
-          ratePerMin: 0.0,
+          ratePerMin: isAdvisor ? 0.49 : 0.0,
           updatedAt: DateTime.now().toIso8601String(),
         );
 
@@ -89,9 +90,9 @@ class _WalletScreenState extends State<WalletScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
-        title: const Text(
-          "My Wallet & Transaction History",
-          style: TextStyle(
+        title: Text(
+          isAdvisor ? "Advisor Wallet & Payout History" : "My Wallet & Transaction History",
+          style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 18,
             color: Color(0xFF0F172A),
@@ -149,9 +150,11 @@ class _WalletScreenState extends State<WalletScreen> {
                           builder: (context, constraints) {
                             final isWide = constraints.maxWidth >= 768;
 
-                            final card1 = _buildCurrentBalanceCard(summary);
-                            final card2 = _buildFreeMinutesCard(rawMinBalance, freeMinutesOver);
-                            final card3 = _buildRateCard(summary);
+                            final card1 = _buildCurrentBalanceCard(summary, isAdvisor);
+                            final card2 = isAdvisor
+                                ? _buildAdvisorEarningsStatusCard(summary)
+                                : _buildFreeMinutesCard(rawMinBalance, freeMinutesOver);
+                            final card3 = _buildRateCard(summary, isAdvisor);
 
                             if (isWide) {
                               return Row(
@@ -386,7 +389,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   // Card 1: Current Balance
-  Widget _buildCurrentBalanceCard(UserWalletSummary summary) {
+  Widget _buildCurrentBalanceCard(UserWalletSummary summary, bool isAdvisor) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -411,34 +414,55 @@ class _WalletScreenState extends State<WalletScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Current Balance",
-                style: TextStyle(
+              Text(
+                isAdvisor ? "Available Earnings Balance" : "Current Balance",
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF64748B),
                 ),
               ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4F46E5), // Indigo matching web action
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              if (!isAdvisor)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5), // Indigo matching web action
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                  label: const Text(
+                    "Add Funds",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddFundsScreen()),
+                    ).then((_) => _loadData());
+                  },
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.verified_user_rounded, size: 14, color: Color(0xFF4F46E5)),
+                      SizedBox(width: 4),
+                      Text(
+                        "Advisor Wallet",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF4F46E5)),
+                      ),
+                    ],
+                  ),
                 ),
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
-                label: const Text(
-                  "Add Funds",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddFundsScreen()),
-                  ).then((_) => _loadData());
-                },
-              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -450,6 +474,73 @@ class _WalletScreenState extends State<WalletScreen> {
               color: Color(0xFF0F172A),
               letterSpacing: -0.5,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Advisor Card 2: Readings & Payouts
+  Widget _buildAdvisorEarningsStatusCard(UserWalletSummary summary) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Readings & Payouts",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: const Text(
+                  "Active",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF065F46),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            "Live Earnings",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF047857),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Recorded from client reading sessions",
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
           ),
         ],
       ),
@@ -530,7 +621,8 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   // Card 3: Rate / Min
-  Widget _buildRateCard(UserWalletSummary summary) {
+  Widget _buildRateCard(UserWalletSummary summary, bool isAdvisor) {
+    final displayRate = summary.ratePerMin > 0 ? summary.ratePerMin : (isAdvisor ? 0.49 : 0.0);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -548,9 +640,9 @@ class _WalletScreenState extends State<WalletScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Rate / Min",
-            style: TextStyle(
+          Text(
+            isAdvisor ? "Advisor Rate" : "Rate / Min",
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Color(0xFF64748B),
@@ -558,7 +650,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            "\$ ${summary.ratePerMin.toStringAsFixed(2)}",
+            "\$ ${displayRate.toStringAsFixed(2)}${isAdvisor ? ' / min' : ''}",
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -566,9 +658,9 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            "Default per-minute service rate",
-            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          Text(
+            isAdvisor ? "Your standard reading session rate" : "Default per-minute service rate",
+            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
           ),
         ],
       ),

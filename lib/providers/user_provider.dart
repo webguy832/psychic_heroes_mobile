@@ -202,7 +202,7 @@ class UserProvider extends ChangeNotifier {
 
   Future<void> fetchWalletSummary() async {
     try {
-      _walletSummary = await _userService.getWalletSummary();
+      _walletSummary = await _userService.getWalletSummary(isAdvisor: isAdvisor);
       if (_walletSummary != null && _user != null) {
         _user = _user!.copyWith(
           walletBalance: _walletSummary!.balance,
@@ -222,8 +222,8 @@ class UserProvider extends ChangeNotifier {
 
     try {
       final results = await Future.wait([
-        _userService.getWalletSummary(),
-        _userService.getTransactions(),
+        _userService.getWalletSummary(isAdvisor: isAdvisor),
+        _userService.getTransactions(isAdvisor: isAdvisor),
       ]);
       _walletSummary = results[0] as UserWalletSummary?;
       _transactions = results[1] as List<TransactionHistoryDto>;
@@ -244,7 +244,7 @@ class UserProvider extends ChangeNotifier {
 
   Future<void> fetchTransactions() async {
     try {
-      _transactions = await _userService.getTransactions();
+      _transactions = await _userService.getTransactions(isAdvisor: isAdvisor);
       notifyListeners();
     } catch (e) {
       _errorMessage = e.toString();
@@ -253,11 +253,14 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<void> fetchReadingHistory() async {
+    _isLoading = true;
+    notifyListeners();
     try {
-      _readingHistory = await _userService.getReadingHistory();
-      notifyListeners();
+      _readingHistory = await _userService.getReadingHistory(isAdvisor: isAdvisor);
     } catch (e) {
       _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }

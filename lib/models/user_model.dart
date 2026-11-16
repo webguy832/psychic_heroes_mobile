@@ -225,7 +225,7 @@ class UserWalletSummary {
   });
 
   factory UserWalletSummary.fromJson(Map<String, dynamic> json) {
-    final rawBal = json['balance'] ?? json['Balance'] ?? 0;
+    final rawBal = json['availableBalance'] ?? json['balance'] ?? json['Balance'] ?? json['totalEarnings'] ?? 0;
     final rawMin = json['minBalance'] ?? json['MinBalance'] ?? json['minsBalance'] ?? json['MinsBalance'] ?? 0;
     final rawRate = json['ratePerMin'] ?? json['RatePerMin'] ?? 0;
 
@@ -286,16 +286,34 @@ class TransactionHistoryDto {
     final rawBalance = json['balance'] ?? json['Balance'] ?? 0;
     final rawMins = json['minsBalance'] ?? json['MinsBalance'] ?? 0;
 
+    String desc = json['description']?.toString() ??
+        json['Description']?.toString() ??
+        json['title']?.toString() ??
+        '';
+    if (desc.isEmpty && json['screenName'] != null) {
+      desc = "Reading session with ${json['screenName']}";
+    }
+    if (desc.isEmpty) {
+      desc = "Transaction";
+    }
+
+    final rawDate = json['createdAt']?.toString() ??
+        json['CreatedAt']?.toString() ??
+        json['requestDate']?.toString() ??
+        json['RequestDate']?.toString() ??
+        json['date']?.toString() ??
+        '';
+
     return TransactionHistoryDto(
-      id: json['transactionId']?.toString() ?? json['transId']?.toString() ?? json['id']?.toString() ?? 'TXN-1',
-      transactionId: json['transactionId']?.toString() ?? json['transId']?.toString() ?? '',
+      id: json['transactionId']?.toString() ?? json['transId']?.toString() ?? json['TransId']?.toString() ?? json['id']?.toString() ?? 'TXN-1',
+      transactionId: json['transactionId']?.toString() ?? json['transId']?.toString() ?? json['TransId']?.toString() ?? '',
       transType: json['transType']?.toString() ?? json['TransType']?.toString() ?? '',
-      description: json['description']?.toString() ?? json['Description']?.toString() ?? json['title']?.toString() ?? '',
+      description: desc,
       credit: (rawCredit is num) ? rawCredit.toDouble() : double.tryParse(rawCredit.toString()) ?? 0.0,
       debit: (rawDebit is num) ? rawDebit.toDouble() : double.tryParse(rawDebit.toString()) ?? 0.0,
       balance: (rawBalance is num) ? rawBalance.toDouble() : double.tryParse(rawBalance.toString()) ?? 0.0,
       minsBalance: (rawMins is num) ? rawMins.toDouble() : double.tryParse(rawMins.toString()) ?? 0.0,
-      createdAt: json['createdAt']?.toString() ?? json['CreatedAt']?.toString() ?? json['date']?.toString() ?? '',
+      createdAt: rawDate,
       invoiceId: json['invoiceId']?.toString() ?? json['InvoiceId']?.toString(),
       externalTransactionId: json['externalTransactionId']?.toString() ?? json['transactionId2']?.toString() ?? json['TransactionId2']?.toString(),
     );
@@ -330,7 +348,7 @@ class ReadingHistoryItem {
   });
 
   factory ReadingHistoryItem.fromJson(Map<String, dynamic> json) {
-    final typeId = json['requestType'] ?? 1;
+    final typeId = json['requestType'] ?? json['RequestType'] ?? json['transType'] ?? 1;
     String typeLabel = 'Live Chat';
     String typeKey = 'chat';
     if (typeId == 2) {
@@ -344,23 +362,61 @@ class ReadingHistoryItem {
       typeKey = 'text';
     }
 
-    final dur = json['duration'];
+    final dur = json['duration'] ?? json['Duration'];
     final durationStr = dur is num && dur > 0
-        ? '${(dur / 60).ceil()} mins'
+        ? (dur >= 60 ? '${(dur / 60).ceil()} mins' : '$dur mins')
         : (json['duration']?.toString() ?? '10 mins');
 
+    final participant = json['advisorDisplayName'] ??
+        json['AdvisorDisplayName'] ??
+        json['advisorName'] ??
+        json['AdvisorName'] ??
+        json['clientDisplayName'] ??
+        json['ClientDisplayName'] ??
+        json['clientName'] ??
+        json['ClientName'] ??
+        json['screenName'] ??
+        json['ScreenName'] ??
+        'User';
+
+    final rawCost = json['chargedAmount'] ??
+        json['ChargedAmount'] ??
+        json['advisorFee'] ??
+        json['AdvisorFee'] ??
+        json['credit'] ??
+        json['Credit'] ??
+        json['cost'] ??
+        0;
+    final costVal = (rawCost is num) ? rawCost.toDouble() : double.tryParse(rawCost.toString()) ?? 0.0;
+
+    final dateVal = json['requestOn']?.toString().split('T').first ??
+        json['RequestOn']?.toString().split('T').first ??
+        json['requestDate']?.toString().split('T').first ??
+        json['RequestDate']?.toString().split('T').first ??
+        json['createdAt']?.toString().split('T').first ??
+        json['CreatedAt']?.toString().split('T').first ??
+        json['date']?.toString() ??
+        'Recent';
+
+    final summaryVal = json['summaryPreview'] ??
+        json['SummaryPreview'] ??
+        json['summary'] ??
+        json['description'] ??
+        json['Description'] ??
+        'Completed psychic reading session';
+
     return ReadingHistoryItem(
-      id: json['requestId']?.toString() ?? json['id']?.toString() ?? '',
+      id: json['requestId']?.toString() ?? json['RequestId']?.toString() ?? json['id']?.toString() ?? '',
       title: json['title'] ?? '$typeLabel Session',
-      advisorName: json['advisorDisplayName'] ?? json['advisorName'] ?? 'Psychic Advisor',
+      advisorName: participant,
       type: json['type'] ?? typeLabel,
       typeKey: json['typeKey'] ?? typeKey,
       duration: durationStr,
-      date: json['requestOn']?.toString().split('T').first ?? json['date'] ?? 'Recent',
-      cost: (json['chargedAmount'] ?? json['cost'] ?? 0).toDouble(),
-      rating: ((json['rating'] ?? 5) as num).toInt(),
-      summary: json['summaryPreview'] ?? json['summary'] ?? '',
-      profilePhoto: json['profilePhoto'],
+      date: dateVal,
+      cost: costVal,
+      rating: ((json['rating'] ?? json['Rating'] ?? 5) as num).toInt(),
+      summary: summaryVal,
+      profilePhoto: json['profilePhoto'] ?? json['ProfilePhoto'],
     );
   }
 }

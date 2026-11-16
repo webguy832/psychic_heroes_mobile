@@ -31,6 +31,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   Widget build(BuildContext context) {
     final userProv = Provider.of<UserProvider>(context);
     final readings = userProv.readingHistory;
+    final isAdvisor = userProv.isAdvisor;
 
     final filtered = readings.where((r) {
       final matchesCategory = _selectedCategory == "all" || r.typeKey.toLowerCase() == _selectedCategory.toLowerCase();
@@ -45,179 +46,212 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.bgDarkCard,
         elevation: 1,
-        title: const Text("Reading & Session History", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+        title: Text(
+          isAdvisor ? "Client Reading & Session History" : "Reading & Session History",
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+        ),
+        actions: [
+          IconButton(
+            tooltip: "Refresh History",
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+            onPressed: () => userProv.fetchReadingHistory(),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: AppStyles.paddingPage,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Search Box
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.borderDark),
-                    ),
-                    child: TextField(
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        icon: Icon(Icons.search_rounded, color: AppColors.textSecondaryDark),
-                        hintText: "Search by advisor or session topic...",
-                        hintStyle: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
-                        border: InputBorder.none,
+      body: RefreshIndicator(
+        onRefresh: () async => userProv.fetchReadingHistory(),
+        color: AppColors.accentGold,
+        backgroundColor: AppColors.bgDarkCard,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              Padding(
+                padding: AppStyles.paddingPage,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Search Box
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgDarkCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.borderDark),
                       ),
-                      onChanged: (val) => setState(() => _searchQuery = val),
+                      child: TextField(
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          icon: const Icon(Icons.search_rounded, color: AppColors.textSecondaryDark),
+                          hintText: isAdvisor
+                              ? "Search by client name or session topic..."
+                              : "Search by advisor or session topic...",
+                          hintStyle: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Category Filter Tabs
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterChip("all", "All Sessions"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("chat", "Live Chat"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("voice", "Voice Calls"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("video", "Video Calls"),
-                      ],
+                    // Category Filter Tabs
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildFilterChip("all", "All Sessions"),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("chat", "Live Chat"),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("voice", "Voice Calls"),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("video", "Video Calls"),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // History Readings List
-                  userProv.isLoading && readings.isEmpty
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(40),
-                            child: LoadingIndicator(message: "Loading readings..."),
-                          ),
-                        )
-                      : filtered.isEmpty
-                          ? Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(32),
-                              decoration: BoxDecoration(color: AppColors.bgDarkCard, borderRadius: BorderRadius.circular(16)),
-                              child: Column(
-                                children: const [
-                                  Icon(Icons.auto_stories_rounded, color: AppColors.textSecondaryDark, size: 48),
-                                  SizedBox(height: 12),
-                                  Text("No Reading History Found", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                  SizedBox(height: 4),
-                                  Text("Completed sessions and transcripts will appear here.", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: filtered.length,
-                              itemBuilder: (ctx, i) {
-                                final item = filtered[i];
-                                final isVideo = item.typeKey.toLowerCase() == 'video';
-                                final isVoice = item.typeKey.toLowerCase() == 'voice';
-                                final itemColor = isVideo ? AppColors.accentCyan : (isVoice ? AppColors.onlineGreen : AppColors.accentGold);
-                                final itemIcon = isVideo ? Icons.videocam_rounded : (isVoice ? Icons.phone_in_talk_rounded : Icons.chat_bubble_rounded);
+                    // History Readings List
+                    userProv.isLoading && readings.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(40),
+                              child: LoadingIndicator(message: "Loading session history..."),
+                            ),
+                          )
+                        : filtered.isEmpty
+                            ? Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(32),
+                                decoration: BoxDecoration(color: AppColors.bgDarkCard, borderRadius: BorderRadius.circular(16)),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.auto_stories_rounded, color: AppColors.textSecondaryDark, size: 48),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      isAdvisor ? "No Client Sessions Found" : "No Reading History Found",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      isAdvisor
+                                          ? "Completed client sessions and readings will appear here."
+                                          : "Completed sessions and transcripts will appear here.",
+                                      style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: filtered.length,
+                                itemBuilder: (ctx, i) {
+                                  final item = filtered[i];
+                                  final isVideo = item.typeKey.toLowerCase() == 'video';
+                                  final isVoice = item.typeKey.toLowerCase() == 'voice';
+                                  final itemColor = isVideo ? AppColors.accentCyan : (isVoice ? AppColors.onlineGreen : AppColors.accentGold);
+                                  final itemIcon = isVideo ? Icons.videocam_rounded : (isVoice ? Icons.phone_in_talk_rounded : Icons.chat_bubble_rounded);
 
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 14),
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgDarkCard,
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(color: AppColors.borderDark),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: itemColor.withOpacity(0.15),
-                                              shape: BoxShape.circle,
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 14),
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.bgDarkCard,
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(color: AppColors.borderDark),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: itemColor.withOpacity(0.15),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(itemIcon, color: itemColor, size: 20),
                                             ),
-                                            child: Icon(itemIcon, color: itemColor, size: 20),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    "${isAdvisor ? 'Client' : 'Advisor'}: ${item.advisorName}",
+                                                    style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 12),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Text(
+                                              "\$${item.cost.toStringAsFixed(2)}",
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.onlineGreen),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(item.summary, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, height: 1.3)),
+                                        const SizedBox(height: 12),
+                                        const Divider(color: AppColors.borderDark, height: 1),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
                                               children: [
-                                                Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                                                const SizedBox(height: 2),
-                                                Text("Advisor: ${item.advisorName}", style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 12)),
+                                                const Icon(Icons.access_time_rounded, color: AppColors.textSecondaryDark, size: 14),
+                                                const SizedBox(width: 4),
+                                                Text("${item.duration} • ${item.date}", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
                                               ],
                                             ),
-                                          ),
-                                          Text("\$${item.cost.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.onlineGreen)),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(item.summary, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, height: 1.3)),
-                                      const SizedBox(height: 12),
-                                      const Divider(color: AppColors.borderDark, height: 1),
-                                      const SizedBox(height: 10),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.access_time_rounded, color: AppColors.textSecondaryDark, size: 14),
-                                              const SizedBox(width: 4),
-                                              Text("${item.duration} • ${item.date}", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
-                                            ],
-                                          ),
-                                          ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.primaryLight,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                            icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                                            label: const Text("View Summary", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => SessionAfterSummaryScreen(
-                                                    isAdvisorView: false,
-                                                    participantName: item.advisorName,
-                                                    formattedTime: item.duration,
-                                                    totalCost: item.cost,
-                                                    sessionTypeLabel: item.type,
-                                                    isLiveSessionEnd: false,
+                                            ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppColors.primaryLight,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              ),
+                                              icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                                              label: const Text("View Summary", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              onPressed: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => SessionAfterSummaryScreen(
+                                                      isAdvisorView: isAdvisor,
+                                                      participantName: item.advisorName,
+                                                      formattedTime: item.duration,
+                                                      totalCost: item.cost,
+                                                      sessionTypeLabel: item.type,
+                                                      isLiveSessionEnd: false,
+                                                    ),
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                ],
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                  ],
+                ),
               ),
-            ),
-            const AppFooterWidget(),
-          ],
+              const AppFooterWidget(),
+            ],
+          ),
         ),
       ),
     );
