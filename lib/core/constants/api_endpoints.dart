@@ -71,7 +71,7 @@ class ApiEndpoints {
   // Packages & Payment Endpoints (Exact matching web_angular_2025)
   static const String getAllPackages = "api/web/GetAllPackages";
   static const String userStatus = "api/user/status";
-  static const String getCountries = "api/common/GetCountries";
+  static const String getCountries = "api/admin/dashboard/GetAllCountries";
   static const String createPaymentIntent = "api/payment/create";
   static const String confirmPayment = "api/payment/confirm";
   static const String validateCoupon = "api/coupon/validate";

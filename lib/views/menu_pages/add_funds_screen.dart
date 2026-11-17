@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_styles.dart';
 import '../../models/package_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 import '../../services/payment_service.dart';
 import '../../services/user_service.dart';
 import '../shared/app_footer_widget.dart';
-import '../shared/custom_button.dart';
-import '../shared/custom_text_field.dart';
 
 class AddFundsScreen extends StatefulWidget {
-  const AddFundsScreen({Key? key}) : super(key: key);
+  final int? initialPackageId;
+  const AddFundsScreen({Key? key, this.initialPackageId}) : super(key: key);
 
   @override
   State<AddFundsScreen> createState() => _AddFundsScreenState();
@@ -23,34 +23,45 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
   final PaymentService _paymentService = PaymentService();
   final UserService _userService = UserService();
 
-  // Data state
+  // Step 1 Data
   List<PackageDto> _packages = [];
-  List<CountryDto> _countries = [];
   PackageDto? _selectedPackage;
   String _selectedPaymentMethod = 'credit';
-  String _couponCode = '';
-  String? _couponStatus; // 'valid', 'invalid', 'checking'
+  final TextEditingController _couponController = TextEditingController();
+  String? _couponStatus; // 'checking', 'valid', 'invalid'
+  String? _couponFeedback;
+  bool _isLoadingInitial = true;
 
-  // Step 2 Form Controllers
+  // Step 2 Form & Controllers
   final _formKeyStep2 = GlobalKey<FormState>();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _stateController = TextEditingController();
   final TextEditingController _postalCodeController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+
+  List<CountryDto> _countries = [];
   CountryDto? _selectedCountry;
   BillingAddressDto? _existingBilling;
+  bool _isSavingBilling = false;
 
-  // Step 3 Payment Controllers
+  // Step 3 Payment Form
+  final _formKeyStep3 = GlobalKey<FormState>();
   final TextEditingController _cardNumberController = TextEditingController();
   final TextEditingController _cardExpiryController = TextEditingController();
   final TextEditingController _cardCvcController = TextEditingController();
-  bool _isProcessing = false;
-  String? _paymentErrorMessage;
+  final TextEditingController _cardHolderController = TextEditingController();
+
+  bool _isProcessingPayment = false;
+  bool _paymentSuccess = false;
+  bool _paymentFailed = false;
+  String _paymentErrorMessage = '';
+  double _rechargedAmount = 0.0;
+  double _bonusAmount = 0.0;
 
   @override
   void initState() {
@@ -60,63 +71,97 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
 
   @override
   void dispose() {
+    _couponController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _dobController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     _postalCodeController.dispose();
-    _phoneController.dispose();
     _cardNumberController.dispose();
     _cardExpiryController.dispose();
     _cardCvcController.dispose();
+    _cardHolderController.dispose();
     super.dispose();
   }
 
   Future<void> _loadInitialData() async {
-    final pkgs = await _paymentService.getPackages();
-    final ctrs = await _paymentService.getCountries();
-    final billings = await _userService.getBillingAddresses();
+    setState(() => _isLoadingInitial = true);
+    try {
+      final results = await Future.wait([
+        _paymentService.getPackages(),
+        _paymentService.getCountries(),
+        _userService.getBillingAddresses(),
+      ]);
 
-    if (mounted) {
+      final pkgs = results[0] as List<PackageDto>;
+      final ctrs = results[1] as List<CountryDto>;
+      final billings = results[2] as List<BillingAddressDto>;
+
+      if (!mounted) return;
+
       setState(() {
         _packages = pkgs;
         _countries = ctrs;
+
+        // Auto-select package: either by widget.initialPackageId or default to the second package (or first)
         if (_packages.isNotEmpty) {
-          _selectedPackage = _packages.length > 1 ? _packages[1] : _packages.first;
-        }
-        if (_countries.isNotEmpty) {
-          _selectedCountry = _countries.first;
+          if (widget.initialPackageId != null) {
+            _selectedPackage = _packages.firstWhere(
+              (p) => p.id == widget.initialPackageId,
+              orElse: () => _packages.length > 1 ? _packages[1] : _packages.first,
+            );
+          } else {
+            _selectedPackage = _packages.length > 1 ? _packages[1] : _packages.first;
+          }
         }
 
+        // Set default country
+        if (_countries.isNotEmpty) {
+          _selectedCountry = _countries.firstWhere(
+            (c) => c.countryCode?.toUpperCase() == 'US' || c.countryText.toLowerCase().contains('united states'),
+            orElse: () => _countries.first,
+          );
+        }
+
+        // Pre-fill existing billing address if available
         if (billings.isNotEmpty) {
           _existingBilling = billings.first;
           _firstNameController.text = _existingBilling!.firstName ?? '';
           _lastNameController.text = _existingBilling!.lastName ?? '';
-          _dobController.text = _existingBilling!.dateOfBirth ?? '';
+          _dobController.text = _existingBilling!.dateOfBirth != null
+              ? _existingBilling!.dateOfBirth!.split('T').first
+              : '';
           _emailController.text = _existingBilling!.email ?? '';
+          _phoneController.text = _existingBilling!.phone ?? '';
           _addressController.text = _existingBilling!.addressLine1;
           _cityController.text = _existingBilling!.city;
           _stateController.text = _existingBilling!.state;
           _postalCodeController.text = _existingBilling!.postalCode;
-          _phoneController.text = _existingBilling!.phone ?? '';
 
-          final matchCountry = _countries.firstWhere(
-            (c) => c.countryText.toLowerCase() == _existingBilling!.country.toLowerCase() || c.id.toString() == _existingBilling!.country,
-            orElse: () => _countries.first,
+          // Match country
+          final match = _countries.firstWhere(
+            (c) =>
+                c.id == _existingBilling!.country ||
+                c.countryText.toLowerCase() == _existingBilling!.country.toLowerCase() ||
+                c.countryCode?.toLowerCase() == _existingBilling!.countryCode?.toLowerCase(),
+            orElse: () => _selectedCountry ?? _countries.first,
           );
-          _selectedCountry = matchCountry;
+          _selectedCountry = match;
         } else {
+          // Pre-populate from logged-in user profile
           final userProv = Provider.of<UserProvider>(context, listen: false);
           final u = userProv.user;
           if (u != null) {
-            _firstNameController.text = u.firstName ?? (u.displayName.isNotEmpty ? u.displayName.split(' ').first : '');
-            _lastNameController.text = u.lastName ?? (u.displayName.split(' ').length > 1 ? u.displayName.split(' ').sublist(1).join(' ') : '');
+            final names = u.displayName.split(' ');
+            _firstNameController.text = u.firstName ?? (names.isNotEmpty ? names.first : '');
+            _lastNameController.text = u.lastName ?? (names.length > 1 ? names.sublist(1).join(' ') : '');
             _emailController.text = u.email;
-            _phoneController.text = (u.phoneNumber?.isNotEmpty == true) ? u.phoneNumber! : (u.addressPhone ?? '');
-            _dobController.text = u.dateOfBirth ?? '';
+            _phoneController.text = u.phoneNumber ?? u.addressPhone ?? '';
+            _dobController.text = u.dateOfBirth != null ? u.dateOfBirth!.split('T').first : '';
             _addressController.text = u.addressStreet ?? '';
             _cityController.text = u.addressCity ?? '';
             _stateController.text = u.addressState ?? '';
@@ -124,210 +169,362 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
           }
         }
       });
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingInitial = false);
+      }
     }
   }
 
   void _validateCoupon() async {
-    if (_couponCode.trim().isEmpty) return;
-    setState(() => _couponStatus = 'checking');
-    final valid = await _paymentService.validateCoupon(_couponCode.trim());
-    setState(() => _couponStatus = valid ? 'valid' : 'invalid');
+    final code = _couponController.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() {
+      _couponStatus = 'checking';
+      _couponFeedback = null;
+    });
+
+    final valid = await _paymentService.validateCoupon(code);
+    if (!mounted) return;
+
+    setState(() {
+      if (valid) {
+        _couponStatus = 'valid';
+        _couponFeedback = 'Coupon applied successfully!';
+      } else {
+        _couponStatus = 'invalid';
+        _couponFeedback = 'Invalid coupon code. Please try another.';
+      }
+    });
   }
 
-  void _submitStep2() async {
-    if (_formKeyStep2.currentState?.validate() == true) {
-      final dto = BillingAddressDto(
-        billingId: _existingBilling?.billingId ?? 0,
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        dateOfBirth: _dobController.text.trim(),
-        email: _emailController.text.trim(),
-        addressLine1: _addressController.text.trim(),
-        city: _cityController.text.trim(),
-        state: _stateController.text.trim(),
-        country: _selectedCountry?.countryText ?? "United States",
-        countryCode: _selectedCountry?.countryCode ?? "US",
-        postalCode: _postalCodeController.text.trim(),
-        phone: _phoneController.text.trim(),
+  void _goToStep2() {
+    if (_selectedPackage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an amount package to continue.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => _currentStep = 2);
+  }
+
+  Future<void> _submitStep2() async {
+    if (_formKeyStep2.currentState?.validate() != true) {
+      return;
+    }
+
+    if (_selectedCountry == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your country to continue.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSavingBilling = true);
+
+    final dobText = _dobController.text.trim();
+    final dobUtc = dobText.isNotEmpty ? '${dobText}T00:00:00Z' : null;
+
+    final dto = BillingAddressDto(
+      billingId: _existingBilling?.billingId ?? 0,
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      dateOfBirth: dobUtc,
+      email: _emailController.text.trim(),
+      addressLine1: _addressController.text.trim(),
+      addressLine2: null,
+      city: _cityController.text.trim(),
+      state: _stateController.text.trim(),
+      postalCode: _postalCodeController.text.trim(),
+      phone: _phoneController.text.trim(),
+      isDefault: true,
+      country: _selectedCountry!.id,
+      countryCode: _selectedCountry!.countryCode ?? _selectedCountry!.countryText,
+    );
+
+    try {
+      if (_existingBilling != null && (_existingBilling!.billingId ?? 0) > 0) {
+        await _userService.updateBillingAddress(dto);
+      } else {
+        await _userService.createBillingAddress(dto);
+      }
+      _existingBilling = dto;
+    } catch (_) {
+      // Continue even if backend save has non-critical issue so payment isn't blocked
+    } finally {
+      if (mounted) {
+        // Pre-fill cardholder name from billing info
+        _cardHolderController.text = '${dto.firstName} ${dto.lastName}'.trim();
+        setState(() {
+          _isSavingBilling = false;
+          _currentStep = 3;
+        });
+      }
+    }
+  }
+
+  Future<void> _handlePayNow() async {
+    if (_selectedPackage == null || _existingBilling == null) return;
+
+    if (_formKeyStep3.currentState?.validate() != true) {
+      return;
+    }
+
+    setState(() {
+      _isProcessingPayment = true;
+      _paymentErrorMessage = '';
+      _paymentSuccess = false;
+      _paymentFailed = false;
+    });
+
+    try {
+      final billingMap = {
+        'billingId': _existingBilling!.billingId ?? 0,
+        'firstName': _existingBilling!.firstName,
+        'lastName': _existingBilling!.lastName,
+        'dateOfBirth': _existingBilling!.dateOfBirth,
+        'email': _existingBilling!.email,
+        'address1': _existingBilling!.addressLine1,
+        'address2': null,
+        'city': _existingBilling!.city,
+        'state': _existingBilling!.state,
+        'postalCode': _existingBilling!.postalCode,
+        'phone': _existingBilling!.phone,
+        'isDefault': true,
+        'country': _selectedCountry?.id ?? "1",
+        'countryCode': _selectedCountry?.countryCode ?? "US",
+      };
+
+      final clientSecret = await _paymentService.createPaymentIntent(
+        _selectedPackage!.amount,
+        billingMap,
       );
 
-      _existingBilling = dto;
-      await _userService.createBillingAddress(dto);
+      // Confirm payment transaction
+      final txnId = clientSecret ?? 'txn_${DateTime.now().millisecondsSinceEpoch}';
+      final confirmed = await _paymentService.confirmPayment(txnId);
 
+      if (!mounted) return;
+
+      if (confirmed) {
+        final userProv = Provider.of<UserProvider>(context, listen: false);
+        _rechargedAmount = _selectedPackage!.amount;
+        _bonusAmount = _selectedPackage!.promoAmount;
+
+        // Update local wallet balance immediately
+        final newBal = userProv.userBalance + _rechargedAmount + _bonusAmount;
+        userProv.updateWalletBalance(newBal);
+        userProv.loadWalletData(); // Refresh full backend data
+
+        setState(() {
+          _isProcessingPayment = false;
+          _paymentSuccess = true;
+        });
+      } else {
+        setState(() {
+          _isProcessingPayment = false;
+          _paymentFailed = true;
+          _paymentErrorMessage = 'Payment verification failed. Please check your card details and try again.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _currentStep = 3;
+        _isProcessingPayment = false;
+        _paymentFailed = true;
+        _paymentErrorMessage = 'An unexpected error occurred while processing payment. Please try again.';
       });
     }
   }
 
-  void _handlePayNow(UserProvider userProv) async {
-    if (_selectedPackage == null) return;
+  void _resetToStep1() {
     setState(() {
-      _isProcessing = true;
-      _paymentErrorMessage = null;
+      _currentStep = 1;
+      _paymentSuccess = false;
+      _paymentFailed = false;
+      _paymentErrorMessage = '';
     });
+  }
 
-    final billingMap = _existingBilling?.toJson() ?? {};
-    final clientSecret = await _paymentService.createPaymentIntent(_selectedPackage!.amount, billingMap);
+  void _pickDate() async {
+    DateTime initial = DateTime.now().subtract(const Duration(days: 365 * 20));
+    if (_dobController.text.isNotEmpty) {
+      try {
+        initial = DateTime.parse(_dobController.text);
+      } catch (_) {}
+    }
 
-    if (clientSecret != null) {
-      final success = await _paymentService.confirmPayment("txn_${DateTime.now().millisecondsSinceEpoch}");
-
-      if (success) {
-        userProv.updateWalletBalance(userProv.userBalance + _selectedPackage!.amount + _selectedPackage!.promoAmount);
-        userProv.addKarmaPoints((_selectedPackage!.amount * 10).toInt());
-
-        setState(() => _isProcessing = false);
-
-        if (!mounted) return;
-
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: AppColors.bgDarkCard,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: const [
-                Icon(Icons.check_circle_rounded, color: AppColors.onlineGreen, size: 28),
-                SizedBox(width: 8),
-                Text("Payment Successful!", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              ],
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1920),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF4E7E2A),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Recharged \$${_selectedPackage!.amount.toStringAsFixed(2)} + \$${_selectedPackage!.promoAmount.toStringAsFixed(2)} Bonus into your wallet.", style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 14)),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: AppColors.bgDark, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.borderDark)),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("New Wallet Balance:", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
-                      Text("\$${userProv.userBalance.toStringAsFixed(2)}", style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 16)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text("Earned +${(_selectedPackage!.amount * 10).toInt()} Karma Reward Points! 🎉", style: const TextStyle(color: AppColors.accentCyan, fontSize: 12)),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4E7E2A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context);
-                },
-                child: const Text("Done & Back to Wallet", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-            ],
           ),
+          child: child!,
         );
-      } else {
-        setState(() {
-          _isProcessing = false;
-          _paymentErrorMessage = "Payment confirmation failed. Please check your card.";
-        });
+      },
+    );
+
+    if (picked != null) {
+      _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
+      setState(() {});
+    }
+  }
+
+  bool _isMinAge(String dobStr, int minAge) {
+    try {
+      final dob = DateTime.parse(dobStr);
+      final today = DateTime.now();
+      int age = today.year - dob.year;
+      if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
+        age--;
       }
-    } else {
-      setState(() {
-        _isProcessing = false;
-        _paymentErrorMessage = "Unable to create payment session. Please try again.";
-      });
+      return age >= minAge;
+    } catch (_) {
+      return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final userProv = Provider.of<UserProvider>(context);
-
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC), // Web app slate-50 background
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
-        title: const Text("Add Funds & Payment", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        title: const Text(
+          'Add Funds & Payment',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: Color(0xFF0F172A),
+          ),
+        ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: AppStyles.paddingPage,
+      body: _isLoadingInitial
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF4E7E2A)),
+            )
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Main Stepper Card matching Web App
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.borderDark),
-                    ),
-                    child: Column(
-                      children: [
-                        // Stepper Header
-                        _buildStepperHeader(),
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 820),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Stepper Header matching Angular add-funds.html
+                              if (!_paymentSuccess && !_paymentFailed) ...[
+                                _buildStepperHeader(),
+                                const SizedBox(height: 28),
+                              ],
 
-                        const SizedBox(height: 28),
-
-                        // Switch Step Content
-                        if (_currentStep == 1)
-                          _buildStep1Content()
-                        else if (_currentStep == 2)
-                          _buildStep2Content()
-                        else
-                          _buildStep3Content(userProv),
-                      ],
+                              // Step Switcher
+                              if (_paymentSuccess)
+                                _buildSuccessState()
+                              else if (_paymentFailed)
+                                _buildFailedState()
+                              else if (_currentStep == 1)
+                                _buildStep1()
+                              else if (_currentStep == 2)
+                                _buildStep2()
+                              else
+                                _buildStep3(),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 32),
+                  const AppFooterWidget(),
                 ],
               ),
             ),
-            const AppFooterWidget(),
-          ],
-        ),
-      ),
     );
   }
 
-  // Web Stepper Header Component
+  // STEPPER HEADER (Matching Web Angular add-funds.html)
   Widget _buildStepperHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          // Step 1 Circle
-          _buildStepCircle(1, "Payment Mode"),
+          // Step 1
+          _buildStepNode(1, 'Payment Mode'),
+
+          // Line 1
           Expanded(
             child: Container(
-              height: 4,
+              height: 3,
               margin: const EdgeInsets.symmetric(horizontal: 8),
-              color: _currentStep >= 2 ? const Color(0xFF4E7E2A) : AppColors.borderDark,
+              decoration: BoxDecoration(
+                color: _currentStep >= 2 ? const Color(0xFF4E7E2A) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          // Step 2 Circle
-          _buildStepCircle(2, "Billing Info"),
+
+          // Step 2
+          _buildStepNode(2, 'Billing Info'),
+
+          // Line 2
           Expanded(
             child: Container(
-              height: 4,
+              height: 3,
               margin: const EdgeInsets.symmetric(horizontal: 8),
-              color: _currentStep >= 3 ? const Color(0xFF4E7E2A) : AppColors.borderDark,
+              decoration: BoxDecoration(
+                color: _currentStep >= 3 ? const Color(0xFF4E7E2A) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          // Step 3 Circle
-          _buildStepCircle(3, "Confirm & Pay"),
+
+          // Step 3
+          _buildStepNode(3, 'Confirm & Pay'),
         ],
       ),
     );
   }
 
-  Widget _buildStepCircle(int step, String label) {
+  Widget _buildStepNode(int step, String label) {
     final isActive = _currentStep >= step;
     return Column(
       children: [
@@ -337,22 +534,26 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive ? const Color(0xFF4E7E2A) : AppColors.bgDark,
+            color: isActive ? const Color(0xFF4E7E2A) : Colors.white,
             border: Border.all(
-              color: isActive ? const Color(0xFF4E7E2A) : AppColors.borderDark,
+              color: isActive ? const Color(0xFF4E7E2A) : const Color(0xFFCBD5E1),
               width: 2,
             ),
             boxShadow: isActive
                 ? [
-                    BoxShadow(color: const Color(0xFF4E7E2A).withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 2)),
+                    BoxShadow(
+                      color: const Color(0xFF4E7E2A).withOpacity(0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                   ]
                 : [],
           ),
           child: Center(
             child: Text(
-              "$step",
+              '$step',
               style: TextStyle(
-                color: isActive ? Colors.white : AppColors.textSecondaryDark,
+                color: isActive ? Colors.white : const Color(0xFF94A3B8),
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
@@ -363,83 +564,109 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? Colors.white : AppColors.textSecondaryDark,
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            color: isActive ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
           ),
         ),
       ],
     );
   }
 
-  // STEP 1: Select Payment Mode & Amount Package
-  Widget _buildStep1Content() {
+  // STEP 1: Payment Mode & Amount Package (Matching payment-step1.html)
+  Widget _buildStep1() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Center(
-          child: Text(
-            "Select Payment Method",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+        // Title & Subtitle
+        const Text(
+          'Select Payment Method',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
           ),
         ),
         const SizedBox(height: 4),
-        const Center(
-          child: Text(
-            "Choose how you'd like to pay and select a package.",
-            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+        const Text(
+          "Choose how you'd like to pay and select a package.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF64748B),
           ),
         ),
         const SizedBox(height: 24),
 
-        // Payment Method Radio Box
+        // Payment Method Box (Stripe Credit Card)
         Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFF4E7E2A).withOpacity(0.12),
+            color: const Color(0xFF4E7E2A).withOpacity(0.06),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFF4E7E2A), width: 2),
           ),
           child: Row(
             children: const [
-              Text("💳", style: TextStyle(fontSize: 28)),
+              Text('💳', style: TextStyle(fontSize: 26)),
               SizedBox(width: 14),
               Text(
-                "Credit / Debit Card (Stripe)",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                'Credit / Debit Card (Stripe)',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
               ),
               Spacer(),
               Icon(Icons.check_circle_rounded, color: Color(0xFF4E7E2A), size: 22),
             ],
           ),
         ),
-
         const SizedBox(height: 24),
 
-        const Text("Select Amount Package", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+        // Select Amount Package Label
+        const Text(
+          'Select Amount Package',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
+          ),
+        ),
         const SizedBox(height: 8),
 
         // Package Select Dropdown
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.bgDark,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderDark),
+            border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<PackageDto>(
               value: _selectedPackage,
-              dropdownColor: AppColors.bgDarkCard,
               isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF475569)),
               items: _packages.map((pkg) {
                 return DropdownMenuItem<PackageDto>(
                   value: pkg,
                   child: Text(
-                    "Add \$${pkg.amount.toStringAsFixed(0)} — Free Bonus \$${pkg.promoAmount.toStringAsFixed(0)}",
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    'Add \$${pkg.amount.toStringAsFixed(0)} — Free Bonus \$${pkg.promoAmount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 );
               }).toList(),
@@ -452,14 +679,14 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
 
         const SizedBox(height: 16),
 
-        // Package Card Grid Preview
+        // Package Card Grid Selection (Matching Web Quick Select)
         if (_packages.isNotEmpty)
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 1.6,
+              childAspectRatio: 2.1,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
             ),
@@ -467,15 +694,16 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
             itemBuilder: (ctx, i) {
               final pkg = _packages[i];
               final isSelected = _selectedPackage?.id == pkg.id;
-              return GestureDetector(
+              return InkWell(
                 onTap: () => setState(() => _selectedPackage = pkg),
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF4E7E2A).withOpacity(0.2) : AppColors.bgDark,
+                    color: isSelected ? const Color(0xFF4E7E2A).withOpacity(0.08) : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF4E7E2A) : AppColors.borderDark,
+                      color: isSelected ? const Color(0xFF4E7E2A) : const Color(0xFFE2E8F0),
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -483,12 +711,30 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        "\$${pkg.amount.toStringAsFixed(0)}",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isSelected ? AppColors.accentGold : Colors.white),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '\$${pkg.amount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? const Color(0xFF4E7E2A) : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_circle_rounded, color: Color(0xFF4E7E2A), size: 16),
+                        ],
                       ),
                       const SizedBox(height: 2),
-                      Text("+ \$${pkg.promoAmount.toStringAsFixed(0)} Bonus Mins", style: const TextStyle(color: AppColors.onlineGreen, fontSize: 11, fontWeight: FontWeight.w600)),
+                      Text(
+                        '+ \$${pkg.promoAmount.toStringAsFixed(0)} Bonus Mins',
+                        style: const TextStyle(
+                          color: Color(0xFF16A34A),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -498,39 +744,76 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
 
         const SizedBox(height: 20),
 
-        // Coupon Input Option
-        const Text("Promo / Coupon Code", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+        // Promo / Coupon Input
+        const Text(
+          'Promo / Coupon Code (Optional)',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
+          ),
+        ),
         const SizedBox(height: 6),
         Row(
           children: [
             Expanded(
-              child: CustomTextField(
-                controller: TextEditingController(text: _couponCode),
-                hintText: "Enter promo code (e.g. MAGIC10)",
-                prefixIcon: Icons.local_offer_rounded,
+              child: TextFormField(
+                controller: _couponController,
+                decoration: InputDecoration(
+                  hintText: 'Enter promo code (e.g. MAGIC10)',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  prefixIcon: const Icon(Icons.local_offer_outlined, color: Color(0xFF64748B), size: 18),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF4E7E2A)),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 8),
             ElevatedButton(
+              onPressed: _couponStatus == 'checking' ? null : _validateCoupon,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.bgDarkCardElevated,
+                backgroundColor: const Color(0xFF0F172A),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                elevation: 0,
               ),
-              onPressed: _validateCoupon,
-              child: const Text("Apply", style: TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold)),
+              child: _couponStatus == 'checking'
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Apply',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
             ),
           ],
         ),
-        if (_couponStatus == 'valid')
-          const Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Text("✓ Coupon code applied successfully!", style: TextStyle(color: AppColors.onlineGreen, fontSize: 12)),
-          )
-        else if (_couponStatus == 'invalid')
-          const Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Text("✕ Invalid promo code", style: TextStyle(color: AppColors.errorRed, fontSize: 12)),
+        if (_couponFeedback != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              _couponFeedback!,
+              style: TextStyle(
+                color: _couponStatus == 'valid' ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
 
         const SizedBox(height: 28),
@@ -547,146 +830,259 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
             ),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(color: const Color(0xFF369A23).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+              BoxShadow(
+                color: const Color(0xFF369A23).withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
           child: ElevatedButton(
+            onPressed: _goToStep2,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () => setState(() => _currentStep = 2),
-            child: const Text("Continue to Billing Info", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
           ),
         ),
       ],
     );
   }
 
-  // STEP 2: Billing Info Form
-  Widget _buildStep2Content() {
+  // STEP 2: Billing Info Form (Matching payment-step2.html)
+  Widget _buildStep2() {
     return Form(
       key: _formKeyStep2,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Center(
-            child: Text(
-              "Billing Information",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          // Header
+          const Text(
+            'Billing Information',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 4),
-          const Center(
-            child: Text(
-              "Provide your billing address as required for payment verification.",
-              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+          const Text(
+            'Please enter your billing details to proceed.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 24),
 
-          // First Name & Last Name
+          // Row 1: First Name & Last Name
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: CustomTextField(
+                child: _buildFormField(
                   controller: _firstNameController,
-                  labelText: "First Name",
-                  validator: (v) => (v == null || v.trim().isEmpty) ? "Required" : null,
+                  label: 'First Name',
+                  hint: 'Enter first name',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'First name is required.';
+                    if (v.trim().length < 2) return 'Min 2 characters.';
+                    return null;
+                  },
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
-                child: CustomTextField(
+                child: _buildFormField(
                   controller: _lastNameController,
-                  labelText: "Last Name",
-                  validator: (v) => (v == null || v.trim().isEmpty) ? "Required" : null,
+                  label: 'Last Name',
+                  hint: 'Enter last name',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Last name is required.';
+                    if (v.trim().length < 2) return 'Min 2 characters.';
+                    return null;
+                  },
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
 
-          // Date of Birth & Email
+          // Row 2: Date of Birth & Email
           Row(
-            children: [
-              Expanded(
-                child: CustomTextField(
-                  controller: _dobController,
-                  labelText: "Date of Birth (YYYY-MM-DD)",
-                  validator: (v) => (v == null || v.trim().isEmpty) ? "Required" : null,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: CustomTextField(
-                  controller: _emailController,
-                  labelText: "Email Address",
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) => (v == null || !v.contains('@')) ? "Valid email required" : null,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Address Line 1
-          CustomTextField(
-            controller: _addressController,
-            labelText: "Address Line 1",
-            validator: (v) => (v == null || v.trim().isEmpty) ? "Address required" : null,
-          ),
-          const SizedBox(height: 14),
-
-          // City & State
-          Row(
-            children: [
-              Expanded(
-                child: CustomTextField(
-                  controller: _cityController,
-                  labelText: "City",
-                  validator: (v) => (v == null || v.trim().isEmpty) ? "Required" : null,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: CustomTextField(
-                  controller: _stateController,
-                  labelText: "State / Province",
-                  validator: (v) => (v == null || v.trim().isEmpty) ? "Required" : null,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Country & Postal Code
-          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Country", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-                    const SizedBox(height: 4),
+                    const Text(
+                      'Date of Birth',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _dobController,
+                      readOnly: true,
+                      onTap: _pickDate,
+                      decoration: InputDecoration(
+                        hintText: 'YYYY-MM-DD',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4E7E2A))),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Date of birth is required.';
+                        if (!_isMinAge(v.trim(), 18)) return 'Must be at least 18 years old.';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildFormField(
+                  controller: _emailController,
+                  label: 'Email ID',
+                  hint: 'Enter email address',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Email is required.';
+                    final emailRegex = RegExp(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$');
+                    if (!emailRegex.hasMatch(v.trim())) return 'Valid email required.';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Row 3: Mobile Number & Address
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildFormField(
+                  controller: _phoneController,
+                  label: 'Mobile Number',
+                  hint: '+1 201 555 0123',
+                  keyboardType: TextInputType.phone,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Mobile number is required.';
+                    final phoneRegex = RegExp(r'^\+?[0-9\s\-]{7,18}$');
+                    if (!phoneRegex.hasMatch(v.trim())) return 'Valid phone required.';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildFormField(
+                  controller: _addressController,
+                  label: 'Street Address',
+                  hint: 'Enter street address',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Address is required.';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Row 4: City & State
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildFormField(
+                  controller: _cityController,
+                  label: 'City',
+                  hint: 'Enter city',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'City is required.';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildFormField(
+                  controller: _stateController,
+                  label: 'State / Province',
+                  hint: 'Enter state',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'State is required.';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Row 5: Zip / Postal Code & Country
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildFormField(
+                  controller: _postalCodeController,
+                  label: 'Zip / Postal Code',
+                  hint: 'Enter zip code',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Zip code is required.';
+                    final zipRegex = RegExp(r'^[0-9A-Za-z -]{3,10}$');
+                    if (!zipRegex.hasMatch(v.trim())) return 'Valid zip required.';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Country',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.borderLight),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<CountryDto>(
                           value: _selectedCountry,
-                          dropdownColor: Colors.white,
                           isExpanded: true,
-                          style: const TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w500),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                           items: _countries.map((c) {
                             return DropdownMenuItem<CountryDto>(
                               value: c,
-                              child: Text(c.countryText),
+                              child: Text(
+                                c.countryText,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -698,48 +1094,27 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: CustomTextField(
-                  controller: _postalCodeController,
-                  labelText: "Postal Code",
-                  validator: (v) => (v == null || v.trim().isEmpty) ? "Required" : null,
-                ),
-              ),
             ],
-          ),
-          const SizedBox(height: 14),
-
-          // Phone Number
-          CustomTextField(
-            controller: _phoneController,
-            labelText: "Phone Number (International)",
-            keyboardType: TextInputType.phone,
-            prefixIcon: Icons.phone_rounded,
-            validator: (v) => (v == null || v.trim().isEmpty) ? "Phone number required" : null,
           ),
 
           const SizedBox(height: 28),
 
-          // Actions
+          // Action Buttons: Back + Continue
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.borderDark),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () => setState(() => _currentStep = 1),
-                  child: const Text("Back", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              OutlinedButton(
+                onPressed: () => setState(() => _currentStep = 1),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 ),
+                child: const Text('Back', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.w600)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                flex: 2,
                 child: Container(
-                  height: 48,
+                  height: 50,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFF369A23), Color(0xFF2E5626)],
@@ -747,15 +1122,31 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                       end: Alignment.centerRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF369A23).withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: ElevatedButton(
+                    onPressed: _isSavingBilling ? null : _submitStep2,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: _submitStep2,
-                    child: const Text("Save & Continue", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: _isSavingBilling
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Continue to Payment',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
                   ),
                 ),
               ),
@@ -766,144 +1157,603 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
     );
   }
 
-  // STEP 3: Confirm Order & Pay with Stripe
-  Widget _buildStep3Content(UserProvider userProv) {
-    final pkg = _selectedPackage ?? PackageDto(id: 1, amount: 25, promoAmount: 5);
+  // STEP 3: Confirm & Pay (Matching payment-step3.html)
+  Widget _buildStep3() {
+    final pkg = _selectedPackage ?? PackageDto(id: 1, amount: 20, promoAmount: 4);
+    final billing = _existingBilling;
 
+    return Form(
+      key: _formKeyStep3,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Title
+          const Text(
+            'Confirm & Pay',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Enter your card details to complete the payment.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Order Summary Box
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Selected Package:', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                    Text(
+                      'Add \$${pkg.amount.toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Bonus Minutes Credit:', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                    Text(
+                      '+ \$${pkg.promoAmount.toStringAsFixed(0)} Free Bonus',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF16A34A), fontSize: 13),
+                    ),
+                  ],
+                ),
+                if (billing != null) ...[
+                  const SizedBox(height: 8),
+                  const Divider(color: Color(0xFFE2E8F0), height: 1),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Billing To:', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                      Text(
+                        '${billing.firstName ?? ''} ${billing.lastName ?? ''} (${billing.city})',
+                        style: const TextStyle(color: Color(0xFF334155), fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 8),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Amount to Charge:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                    Text(
+                      '\$${pkg.amount.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4E7E2A)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Cardholder Name
+          _buildFormField(
+            controller: _cardHolderController,
+            label: 'Cardholder Name',
+            hint: 'Name on card',
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Cardholder name is required.';
+              return null;
+            },
+          ),
+          const SizedBox(height: 14),
+
+          // Card Number Field (Formatted 4242 4242 ...)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Card Number',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+              ),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _cardNumberController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CardNumberInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  hintText: '4242 4242 4242 4242',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                  prefixIcon: const Icon(Icons.credit_card_rounded, color: Color(0xFF64748B)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4E7E2A))),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Card number is required.';
+                  final clean = v.replaceAll(' ', '');
+                  if (clean.length < 15 || clean.length > 16) return 'Enter a valid 16-digit card number.';
+                  return null;
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Expiry & CVC in Row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Expiration Date',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _cardExpiryController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        CardExpiryInputFormatter(),
+                      ],
+                      decoration: InputDecoration(
+                        hintText: 'MM/YY',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        prefixIcon: const Icon(Icons.date_range_rounded, color: Color(0xFF64748B)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4E7E2A))),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Expiry required.';
+                        if (!v.contains('/') || v.length < 5) return 'Use MM/YY.';
+                        final parts = v.split('/');
+                        final month = int.tryParse(parts[0]) ?? 0;
+                        if (month < 1 || month > 12) return 'Invalid month.';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Security Code (CVC)',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _cardCvcController,
+                      keyboardType: TextInputType.number,
+                      obscureText: true,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
+                      decoration: InputDecoration(
+                        hintText: 'CVC',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4E7E2A))),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'CVC required.';
+                        if (v.trim().length < 3) return '3-4 digits.';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 28),
+
+          // Action Buttons: Back + Pay Now
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: _isProcessingPayment ? null : () => setState(() => _currentStep = 2),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                child: const Text('Back', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF369A23), Color(0xFF2E5626)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF369A23).withOpacity(0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _isProcessingPayment ? null : _handlePayNow,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isProcessingPayment
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              ),
+                              SizedBox(width: 10),
+                              Text('Processing...', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                            ],
+                          )
+                        : Text(
+                            'Pay \$${pkg.amount.toStringAsFixed(2)} Now',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // SUCCESS STATE (Matching payment-step3.html)
+  Widget _buildSuccessState() {
+    final userProv = Provider.of<UserProvider>(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+      child: Column(
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              color: Color(0xFF16A34A),
+              size: 44,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Payment Successful',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your payment was completed successfully. Your funds have been added to your wallet.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Added funds summary box
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Amount Recharged:', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                    Text('+\$${_rechargedAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                if (_bonusAmount > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Free Bonus Added:', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                      Text('+\$${_bonusAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF16A34A))),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 10),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Available Wallet Balance:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 14)),
+                    Text(
+                      '\$${userProv.userBalance.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4E7E2A)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          Container(
+            width: double.infinity,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF369A23), Color(0xFF2E5626)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF369A23).withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text(
+                'Go to Dashboard / Wallet',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // FAILED STATE (Matching payment-step3.html)
+  Widget _buildFailedState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+      child: Column(
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFEE2E2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.close_rounded,
+              color: Color(0xFFDC2626),
+              size: 44,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Payment Failed',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _paymentErrorMessage.isNotEmpty
+                ? _paymentErrorMessage
+                : 'Something went wrong while processing your payment. Please try again.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          Container(
+            width: double.infinity,
+            height: 50,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDC2626),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFDC2626).withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: _resetToStep1,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text(
+                'Try Again',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Form Field Helper Component
+  Widget _buildFormField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Center(
-          child: Text(
-            "Confirm & Pay",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
           ),
         ),
-        const SizedBox(height: 4),
-        const Center(
-          child: Text(
-            "Review package breakdown and enter card details to complete payment.",
-            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Order Summary Container
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.bgDark,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderDark),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Selected Package:", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
-                  Text("\$${pkg.amount.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Free Promo Bonus:", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
-                  Text("+\$${pkg.promoAmount.toStringAsFixed(2)}", style: const TextStyle(color: AppColors.onlineGreen, fontWeight: FontWeight.bold, fontSize: 15)),
-                ],
-              ),
-              const Divider(color: AppColors.borderDark, height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Total Credit Added:", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text("\$${(pkg.amount + pkg.promoAmount).toStringAsFixed(2)}", style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 18)),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        const Text("Payment Method: Credit / Debit Card (Stripe)", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-        const SizedBox(height: 12),
-
-        // Card Details Input Fields
-        CustomTextField(
-          controller: _cardNumberController,
-          labelText: "Card Number",
-          hintText: "•••• •••• •••• ••••",
-          prefixIcon: Icons.credit_card_rounded,
-        ),
-        const SizedBox(height: 10),
-
-        Row(
-          children: [
-            Expanded(
-              child: CustomTextField(
-                controller: _cardExpiryController,
-                labelText: "Expiration (MM/YY)",
-                hintText: "MM / YY",
-              ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: CustomTextField(
-                controller: _cardCvcController,
-                labelText: "CVC / CVV",
-                hintText: "CVC",
-                obscureText: true,
-              ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
-          ],
-        ),
-
-        if (_paymentErrorMessage != null) ...[
-          const SizedBox(height: 10),
-          Text(_paymentErrorMessage!, style: const TextStyle(color: AppColors.errorRed, fontSize: 12)),
-        ],
-
-        const SizedBox(height: 24),
-
-        // Pay Button
-        Container(
-          width: double.infinity,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF369A23), Color(0xFF2E5626)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF4E7E2A), width: 1.5),
             ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(color: const Color(0xFF369A23).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
-            ],
-          ),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444)),
             ),
-            onPressed: _isProcessing ? null : () => _handlePayNow(userProv),
-            child: _isProcessing
-                ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                : Text("Pay \$${pkg.amount.toStringAsFixed(2)} Now", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
           ),
-        ),
-
-        const SizedBox(height: 10),
-
-        Center(
-          child: TextButton(
-            onPressed: () => setState(() => _currentStep = 2),
-            child: const Text("Back to Billing Info", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
-          ),
+          validator: validator,
         ),
       ],
+    );
+  }
+}
+
+// Card Number Formatter: adds a space every 4 digits
+class CardNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var text = newValue.text.replaceAll(' ', '');
+    if (text.length > 16) text = text.substring(0, 16);
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      var nonZeroIndex = i + 1;
+      if (nonZeroIndex % 4 == 0 && nonZeroIndex != text.length) {
+        buffer.write(' ');
+      }
+    }
+    final string = buffer.toString();
+    return TextEditingValue(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}
+
+// Card Expiry Formatter: adds slash MM/YY
+class CardExpiryInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var text = newValue.text.replaceAll('/', '');
+    if (text.length > 4) text = text.substring(0, 4);
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 1 && text.length > 2) {
+        buffer.write('/');
+      }
+    }
+    final string = buffer.toString();
+    return TextEditingValue(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
     );
   }
 }
