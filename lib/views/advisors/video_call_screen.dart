@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -17,17 +18,23 @@ class VideoCallScreen extends StatefulWidget {
   State<VideoCallScreen> createState() => _VideoCallScreenState();
 }
 
-class _VideoCallScreenState extends State<VideoCallScreen> {
+class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProviderStateMixin {
   bool _isChatOpen = false;
   bool _isFrontCamera = true;
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   int _lastMsgCount = 0;
   bool _handledSessionEnd = false;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initSessionChat();
     });
@@ -52,6 +59,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -82,7 +90,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         );
         final summaryCost = sessionProv.chatSummary?['chargedAmount'] ??
             sessionProv.chatSummary?['totalCharges'] ??
-            sessionProv.chatSummary?['ChargedAmount'];
+            sessionProv.chatSummary?['ChargedAmount'] ??
+            sessionProv.chatSummary?['TotalCharges'];
         final finalCost = (summaryCost is num) ? summaryCost.toDouble() : sessionProv.currentSessionCost;
 
         Navigator.pushReplacement(
@@ -119,97 +128,131 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       if (_isChatOpen) _scrollToBottom();
     }
 
+    final double effectiveRate = activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate;
+    final int freeMinutes = activeReq?.freeMinutes ?? (sessionProv.freeLeftSeconds ~/ 60);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
-            // Main Full-Bleed Remote Video Stream Viewport
+            // ── Main Full-Screen Video Canvas ──
             Positioned.fill(
               child: sessionProv.isVideoOn
                   ? Container(
                       decoration: const BoxDecoration(
                         gradient: RadialGradient(
                           center: Alignment.center,
-                          radius: 0.85,
-                          colors: [Color(0xFF1E1B4B), Colors.black],
+                          radius: 0.9,
+                          colors: [Color(0xFF1E1742), Color(0xFF0C0A1A), Colors.black],
                         ),
                       ),
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Live Video Stream Grid Background Frame
+                          // Grid subtle pattern frame
                           Positioned.fill(
                             child: Container(
                               decoration: BoxDecoration(
-                                border: Border.all(color: AppColors.accentCyan.withOpacity(0.2), width: 1.5),
+                                border: Border.all(color: AppColors.accentCyan.withOpacity(0.15), width: 1.5),
                               ),
                             ),
                           ),
 
-                          // Main Remote Video Stream Visual
+                          // Central Speaker Visualizer & Avatar
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Active Speaker Glowing Ring
-                                  Container(
-                                    width: 140,
-                                    height: 140,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: AppColors.accentCyan.withOpacity(0.12),
-                                      border: Border.all(color: AppColors.accentCyan.withOpacity(0.5), width: 2),
-                                      boxShadow: [
-                                        BoxShadow(color: AppColors.accentCyan.withOpacity(0.35), blurRadius: 24, spreadRadius: 4),
-                                      ],
-                                    ),
-                                  ),
-                                  CircleAvatar(
-                                    radius: 56,
-                                    backgroundColor: AppColors.accentPurple,
-                                    child: Text(
-                                      titleName.isNotEmpty ? titleName[0].toUpperCase() : 'V',
-                                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 4,
-                                    right: 4,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle),
-                                      child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 12),
-                                    ),
-                                  ),
-                                ],
+                              AnimatedBuilder(
+                                animation: _pulseController,
+                                builder: (context, _) {
+                                  final pulse = sessionProv.isMuted ? 0.0 : _pulseController.value;
+                                  return Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Active Speaker Glowing Ring
+                                      Container(
+                                        width: 140 + (pulse * 20),
+                                        height: 140 + (pulse * 20),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppColors.accentCyan.withOpacity(0.08 + (pulse * 0.08)),
+                                          border: Border.all(
+                                            color: AppColors.accentCyan.withOpacity(0.3 + (pulse * 0.3)),
+                                            width: 2,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: AppColors.accentCyan.withOpacity(0.25 + (pulse * 0.2)),
+                                              blurRadius: 24,
+                                              spreadRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      CircleAvatar(
+                                        radius: 54,
+                                        backgroundColor: const Color(0xFF4C1D95),
+                                        child: Text(
+                                          titleName.isNotEmpty ? titleName[0].toUpperCase() : 'V',
+                                          style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold, color: Colors.white),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 4,
+                                        right: 4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.onlineGreen,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
-                              const SizedBox(height: 16),
+
+                              const SizedBox(height: 18),
+
+                              // Name & Live HD Stream tag
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle)),
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle),
+                                  ),
                                   const SizedBox(width: 6),
-                                  Text("$titleName (Live HD Video)", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text(
+                                    "$titleName (Live HD Video)",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
                                 ],
                               ),
+
                               const SizedBox(height: 8),
-                              // 1080p HD Badge
+
+                              // Twilio Video Encrypted Stream Badge (Web App Parity)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.black54,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.accentCyan.withOpacity(0.4)),
+                                  border: Border.all(color: AppColors.accentCyan.withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: const [
                                     Icon(Icons.hd_rounded, color: AppColors.accentCyan, size: 14),
                                     SizedBox(width: 4),
-                                    Text("1080p HD • 60 FPS • Encrypted Stream", style: TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      "1080p HD · 60 FPS · WebRTC Opus/H.264",
+                                      style: TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -227,79 +270,121 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                           SizedBox(height: 12),
                           Text("Camera Paused", style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold)),
                           SizedBox(height: 4),
-                          Text("Tap video icon below to resume video feed", style: TextStyle(color: Colors.white38, fontSize: 12)),
+                          Text("Tap video camera icon below to resume live video feed", style: TextStyle(color: Colors.white38, fontSize: 12)),
                         ],
                       ),
                     ),
             ),
 
-            // Top Header Overlay Bar (Title, Status, Timer, End Call)
+            // ── Top Header Overlay (Title, Duration, Rate, Participants, End Call) ──
             Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
+              top: 10,
+              left: 10,
+              right: 10,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.65),
+                  color: Colors.black.withOpacity(0.75),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.accentCyan.withOpacity(0.4)),
+                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
                 ),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.accentCyan, size: 20),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.accentCyan, size: 18),
                       onPressed: () => _confirmEndVideoCall(context, sessionProv, titleName),
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(titleName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
+                          Text(
+                            "📹 Video Call · $titleName",
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
                           Row(
                             children: [
-                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle)),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: sessionProv.isChargingStarted ? AppColors.onlineGreen : AppColors.accentGold,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                               const SizedBox(width: 4),
-                              const Text("LIVE VIDEO SESSION", style: TextStyle(fontSize: 9, color: AppColors.accentCyan, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 6),
                               Text(
                                 sessionProv.isChargingStarted
-                                    ? "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)})"
-                                    : "• \$${(activeReq?.ratePerMinute ?? sessionProv.advisorBaseRate).toStringAsFixed(2)}/min (Grace: ${sessionProv.secondsUntilCharging}s left)",
+                                    ? "Billed: \$${sessionProv.currentSessionCost.toStringAsFixed(2)}"
+                                    : "Grace: ${sessionProv.secondsUntilCharging}s left",
                                 style: TextStyle(
-                                  fontSize: 9,
+                                  fontSize: 10,
                                   color: sessionProv.isChargingStarted ? AppColors.onlineGreen : AppColors.accentGold,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              if (freeMinutes > 0) ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  "• Free: ${freeMinutes}m",
+                                  style: const TextStyle(fontSize: 10, color: AppColors.onlineGreen, fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             ],
                           ),
                         ],
                       ),
                     ),
-                    // Timer Tag
+
+                    // Duration Timer Badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: AppColors.bgDark, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.accentGold)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.accentGold.withOpacity(0.5)),
+                      ),
                       child: Row(
                         children: [
                           const Icon(Icons.timer_rounded, size: 12, color: AppColors.accentGold),
                           const SizedBox(width: 4),
-                          Text(sessionProv.formattedTimer, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accentGold)),
+                          Text(
+                            sessionProv.formattedTimer,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accentGold, fontFamily: 'monospace'),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 6),
+
+                    // Participant Count
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Text("👥 2", style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 6),
+
+                    // End Button
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.errorRed,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 14),
-                      label: const Text("END", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
+                      icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 12),
+                      label: const Text("END", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.white)),
                       onPressed: () => _confirmEndVideoCall(context, sessionProv, titleName),
                     ),
                   ],
@@ -307,9 +392,43 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               ),
             ),
 
-            // PIP Local Camera Window Overlay (Top Right)
+            // ── In-Call Free Minutes Over Toast Banner (Web App Parity) ──
+            if (sessionProv.showFreeFinishedNotice && !widget.isAdvisorView)
+              Positioned(
+                top: 75,
+                left: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Text("⏱️", style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          "Your free minutes are over. Now session time will be deducted from your balance.",
+                          style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.black, size: 16),
+                        onPressed: () => sessionProv.dismissFreeFinishedNotice(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // ── PIP Local Camera Viewport (Top Right) ──
             Positioned(
-              top: 75,
+              top: 80,
               right: 14,
               child: Container(
                 width: 95,
@@ -317,7 +436,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 decoration: BoxDecoration(
                   color: sessionProv.isVideoOn ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: sessionProv.isVideoOn ? AppColors.accentCyan : AppColors.errorRed.withOpacity(0.5), width: 1.5),
+                  border: Border.all(
+                    color: sessionProv.isVideoOn ? AppColors.accentCyan : AppColors.errorRed.withOpacity(0.5),
+                    width: 1.5,
+                  ),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
                   ],
@@ -382,7 +504,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               ),
             ),
 
-            // Floating Controls Bar Overlay (Bottom Center)
+            // ── Floating Controls Bar (Bottom Center) ──
             Positioned(
               bottom: 20,
               left: 20,
@@ -390,31 +512,38 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.8),
+                  color: Colors.black.withOpacity(0.85),
                   borderRadius: BorderRadius.circular(32),
                   border: Border.all(color: Colors.white24),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 16, offset: const Offset(0, 6)),
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // Mute Mic
+                    // Mute / Unmute Mic
                     IconButton(
                       iconSize: 26,
                       icon: Icon(
                         sessionProv.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
                         color: sessionProv.isMuted ? AppColors.errorRed : AppColors.accentGold,
                       ),
+                      tooltip: sessionProv.isMuted ? "Unmute" : "Mute",
                       onPressed: () => sessionProv.toggleMute(),
                     ),
-                    // Toggle Camera On/Off
+
+                    // Toggle Camera Video Feed
                     IconButton(
                       iconSize: 26,
                       icon: Icon(
                         sessionProv.isVideoOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
                         color: sessionProv.isVideoOn ? AppColors.accentCyan : Colors.grey,
                       ),
+                      tooltip: sessionProv.isVideoOn ? "Stop Video" : "Start Video",
                       onPressed: () => sessionProv.toggleVideo(),
                     ),
+
                     // Flip Camera (Front / Back)
                     IconButton(
                       iconSize: 26,
@@ -422,31 +551,60 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         _isFrontCamera ? Icons.flip_camera_android_rounded : Icons.cameraswitch_rounded,
                         color: Colors.white,
                       ),
+                      tooltip: "Flip Camera",
                       onPressed: () {
                         setState(() => _isFrontCamera = !_isFrontCamera);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(_isFrontCamera ? "Switched to Front Camera" : "Switched to Back Camera"), duration: const Duration(milliseconds: 800)),
+                          SnackBar(
+                            content: Text(_isFrontCamera ? "Switched to Front Camera" : "Switched to Back Camera"),
+                            duration: const Duration(milliseconds: 800),
+                          ),
                         );
                       },
                     ),
-                    // In-Call Chat Drawer Toggle
-                    IconButton(
-                      iconSize: 26,
-                      icon: Icon(
-                        _isChatOpen ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
-                        color: AppColors.accentCyan,
-                      ),
-                      onPressed: () {
-                        setState(() => _isChatOpen = !_isChatOpen);
-                        if (_isChatOpen) _scrollToBottom();
-                      },
+
+                    // In-Call Chat Drawer Toggle with unread badge
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          iconSize: 26,
+                          icon: Icon(
+                            _isChatOpen ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+                            color: AppColors.accentCyan,
+                          ),
+                          tooltip: "Chat",
+                          onPressed: () {
+                            setState(() => _isChatOpen = !_isChatOpen);
+                            if (_isChatOpen) _scrollToBottom();
+                          },
+                        ),
+                        if (sessionProv.chatMessages.isNotEmpty && !_isChatOpen)
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: AppColors.accentGold,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                "${sessionProv.chatMessages.length}",
+                                style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.black),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    // End Video Call
+
+                    // End Video Call Button
                     CircleAvatar(
                       backgroundColor: AppColors.errorRed,
                       radius: 22,
                       child: IconButton(
                         icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 20),
+                        tooltip: "End Call",
                         onPressed: () => _confirmEndVideoCall(context, sessionProv, titleName),
                       ),
                     ),
@@ -455,17 +613,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               ),
             ),
 
-            // In-Call Chat Slide-up Sheet
+            // ── In-Call Chat Slide-up Sheet (Web App Parity) ──
             if (_isChatOpen)
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: MediaQuery.of(context).size.height * 0.45,
+                height: MediaQuery.of(context).size.height * 0.48,
                 child: Container(
                   decoration: const BoxDecoration(
-                    color: AppColors.bgDarkCard,
+                    color: Color(0xFF161226),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black, blurRadius: 20, offset: Offset(0, -4)),
+                    ],
                     border: Border(top: BorderSide(color: AppColors.accentCyan)),
                   ),
                   child: Column(
@@ -475,49 +636,70 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text("In-Call Messages", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                            Row(
+                              children: const [
+                                Icon(Icons.chat_bubble_rounded, size: 16, color: AppColors.accentCyan),
+                                SizedBox(width: 8),
+                                Text("In-Call Messages", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
                             IconButton(
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
+                              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 24),
                               onPressed: () => setState(() => _isChatOpen = false),
                             ),
                           ],
                         ),
                       ),
-                      const Divider(color: AppColors.borderDark, height: 1),
+                      const Divider(color: Colors.white12, height: 1),
                       Expanded(
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(12),
-                          itemCount: sessionProv.chatMessages.length,
-                          itemBuilder: (context, index) {
-                            final msg = sessionProv.chatMessages[index];
-                            final isMe = !msg.isOpponent;
+                        child: sessionProv.chatMessages.isEmpty
+                            ? Center(
+                                child: Text(
+                                  "No messages yet.\nType below to message during video call.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(12),
+                                itemCount: sessionProv.chatMessages.length,
+                                itemBuilder: (context, index) {
+                                  final msg = sessionProv.chatMessages[index];
+                                  final isMe = !msg.isOpponent;
 
-                            return Align(
-                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isMe ? AppColors.primaryLight : AppColors.bgDark,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                  children: [
-                                    Text(msg.senderName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isMe ? AppColors.accentGold : AppColors.accentCyan)),
-                                    const SizedBox(height: 2),
-                                    Text(msg.message, style: const TextStyle(fontSize: 13, color: Colors.white)),
-                                  ],
-                                ),
+                                  return Align(
+                                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: isMe ? AppColors.primaryLight : const Color(0xFF24143D),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            msg.senderName,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: isMe ? AppColors.accentGold : AppColors.accentCyan,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(msg.message, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
                       ),
                       Container(
                         padding: const EdgeInsets.all(8),
-                        color: AppColors.bgDark,
+                        color: const Color(0xFF0D0B18),
                         child: SafeArea(
                           child: Row(
                             children: [
@@ -526,10 +708,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                                   controller: _msgController,
                                   style: const TextStyle(color: Colors.white, fontSize: 13),
                                   decoration: InputDecoration(
-                                    hintText: "Send message...",
+                                    hintText: "Send message during video...",
                                     hintStyle: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12),
                                     filled: true,
-                                    fillColor: AppColors.bgDarkCard,
+                                    fillColor: const Color(0xFF1E1B4B),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
                                   ),
@@ -574,7 +756,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgDarkCard,
+        backgroundColor: const Color(0xFF161226),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text("End Video Call?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: Text(
           "Video Call Duration: ${sessionProv.formattedTimer}\nEstimated Cost: \$${sessionProv.currentSessionCost.toStringAsFixed(2)}",
@@ -582,7 +765,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         ),
         actions: [
           TextButton(
-            child: const Text("Cancel", style: TextStyle(color: Colors.white)),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
             onPressed: () => Navigator.pop(ctx),
           ),
           ElevatedButton(
@@ -595,7 +778,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               await sessionProv.endSession();
               final summaryCost = sessionProv.chatSummary?['chargedAmount'] ??
                   sessionProv.chatSummary?['totalCharges'] ??
-                  sessionProv.chatSummary?['ChargedAmount'];
+                  sessionProv.chatSummary?['ChargedAmount'] ??
+                  sessionProv.chatSummary?['TotalCharges'];
               final finalCost = (summaryCost is num) ? summaryCost.toDouble() : costVal;
 
               Navigator.pushReplacement(

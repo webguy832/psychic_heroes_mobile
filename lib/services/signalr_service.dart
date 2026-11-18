@@ -33,6 +33,20 @@ class IncomingChatRequestRealtime {
   });
 
   factory IncomingChatRequestRealtime.fromJson(Map<String, dynamic> json) {
+    int parsedType = 1;
+    if (json['requestType'] is num) {
+      parsedType = (json['requestType'] as num).toInt();
+    } else if (json['RequestType'] is num) {
+      parsedType = (json['RequestType'] as num).toInt();
+    } else if (json['callType'] != null || json['CallType'] != null) {
+      final ct = (json['callType'] ?? json['CallType']).toString().toLowerCase();
+      if (ct.contains('video')) {
+        parsedType = 2; // ReqVideoCall = 2
+      } else if (ct.contains('audio') || ct.contains('voice') || ct.contains('call')) {
+        parsedType = 3; // ReqVoiceCall = 3
+      }
+    }
+
     return IncomingChatRequestRealtime(
       requestId: json['requestId']?.toString() ??
           json['RequestId']?.toString() ??
@@ -42,9 +56,7 @@ class IncomingChatRequestRealtime {
           json['SessionId']?.toString() ??
           json['CallRequestId']?.toString() ??
           '',
-      requestType: (json['requestType'] is num)
-          ? (json['requestType'] as num).toInt()
-          : ((json['RequestType'] is num) ? (json['RequestType'] as num).toInt() : 1),
+      requestType: parsedType,
       clientId: json['clientId']?.toString() ??
           json['ClientId']?.toString() ??
           json['fromUser']?.toString() ??
@@ -134,6 +146,7 @@ class SignalRService {
   final StreamController<dynamic> _chatHoldController = StreamController.broadcast();
   final StreamController<dynamic> _chatResumeController = StreamController.broadcast();
   final StreamController<Map<String, dynamic>> _advisorStatusController = StreamController.broadcast();
+  final StreamController<Map<String, dynamic>> _billingTickController = StreamController.broadcast();
 
   // Public Getters
   SignalRConnectionState get state => _state;
@@ -150,6 +163,7 @@ class SignalRService {
   Stream<dynamic> get chatHoldStream => _chatHoldController.stream;
   Stream<dynamic> get chatResumeStream => _chatResumeController.stream;
   Stream<Map<String, dynamic>> get advisorStatusStream => _advisorStatusController.stream;
+  Stream<Map<String, dynamic>> get billingTickStream => _billingTickController.stream;
 
   /// Ensures SignalR connection is active and user presence is registered (Matching Angular ensureConnected)
   Future<String> ensureConnected({
@@ -362,6 +376,9 @@ class SignalRService {
 
       case 'customer.request.accepted':
       case 'advisorJoined':
+      case 'voiceAccepted':
+      case 'videoAccepted':
+      case 'requestAccepted':
         String connId = '';
         String name = 'Advisor';
         if (args.isNotEmpty) {
@@ -411,6 +428,7 @@ class SignalRService {
 
       case 'advisor.request.incoming':
       case 'incomingSession':
+      case 'incomingVoiceSession':
       case 'incomingVideoSession':
       case 'IncomingCallRequest':
       case 'incomingCallRequest':
@@ -430,7 +448,16 @@ class SignalRService {
 
       case 'chatEndedByOther':
       case 'chatEnded':
+      case 'callEnded':
+      case 'videoCallEnded':
+      case 'CallEnded':
         _chatEndedController.add(args.isNotEmpty ? args[0] : null);
+        break;
+
+      case 'billingTick':
+        if (args.isNotEmpty && args[0] is Map) {
+          _billingTickController.add((args[0] as Map).cast<String, dynamic>());
+        }
         break;
 
       case 'chatOnHold':

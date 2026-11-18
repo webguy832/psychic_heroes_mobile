@@ -39,6 +39,27 @@ class ApiEndpoints {
   static const String updateClientConInfo = "api/Chat/UpdateClientConInfo";
   static const String updateAdvisorConInfo = "api/Chat/UpdateAdvisorConInfo";
 
+  // Voice Call Endpoints (Real .NET 8 backend parity)
+  static const String createVoiceSession = "api/VoiceCall/create-session";
+  static const String acceptVoiceCall = "api/VoiceCall/accept";
+  static const String rejectVoiceCall = "api/VoiceCall/reject";
+  static const String endVoiceCall = "api/VoiceCall/end";
+  static const String voiceSummary = "api/VoiceCall/summary";
+  static const String pendingVoiceCall = "api/VoiceCall/pending";
+
+  // Video Call Endpoints (Real .NET 8 backend parity)
+  static const String createVideoSession = "api/Video/create-session";
+  static const String acceptVideoCall = "api/Video/accept";
+  static const String rejectVideoCall = "api/Video/reject";
+  static const String endVideoCall = "api/Video/end";
+  static const String videoSummary = "api/Video/summary";
+  static const String pendingVideoCall = "api/Video/pending";
+
+  // Twilio Audio & Video Token Endpoints
+  static const String getAudioToken = "api/twilio/get-audio-token";
+  static const String getVideoToken = "api/twilio/get-token";
+  static const String getVideoRoomToken = "api/Video/token";
+
   // User Endpoints
   static const String userProfile = "api/User/GetUserProfile";
   static const String editProfile = "api/User/EditProfile";

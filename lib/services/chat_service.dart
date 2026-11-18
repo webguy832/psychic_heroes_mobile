@@ -368,4 +368,214 @@ class ChatService {
       return null;
     }
   }
+
+  /// Initiates a voice call request from Customer to Advisor via api/VoiceCall/create-session
+  Future<StartChatResult> startVoiceCall({required String advisorId, String? customerId}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.createVoiceSession,
+        body: {
+          'advisorId': advisorId,
+          if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
+        },
+        requiresAuth: true,
+      );
+
+      if (response is Map<String, dynamic>) {
+        return StartChatResult.fromJson(response);
+      }
+      return StartChatResult(success: false, message: "Unexpected response from server");
+    } catch (e) {
+      return StartChatResult(success: false, message: e.toString());
+    }
+  }
+
+  /// Initiates a video call request from Customer to Advisor via api/Video/create-session
+  Future<StartChatResult> startVideoCall({required String advisorId, String? customerId}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.createVideoSession,
+        body: {
+          'advisorId': advisorId,
+          if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
+        },
+        requiresAuth: true,
+      );
+
+      if (response is Map<String, dynamic>) {
+        return StartChatResult.fromJson(response);
+      }
+      return StartChatResult(success: false, message: "Unexpected response from server");
+    } catch (e) {
+      return StartChatResult(success: false, message: e.toString());
+    }
+  }
+
+  /// Advisor accepts a voice call via api/VoiceCall/accept
+  Future<AcceptChatResult> acceptVoiceCall({required String requestId, required String advisorId}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.acceptVoiceCall,
+        body: {
+          'requestId': requestId,
+          'advisorId': advisorId,
+        },
+        requiresAuth: true,
+      );
+      final bool ok = response is Map && (response['success'] == true || response['isSuccess'] == true);
+      return AcceptChatResult(success: ok);
+    } catch (_) {
+      return AcceptChatResult(success: false);
+    }
+  }
+
+  /// Advisor accepts a video call via api/Video/accept
+  Future<AcceptChatResult> acceptVideoCall({required String requestId, required String advisorId}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.acceptVideoCall,
+        body: {
+          'requestId': requestId,
+          'advisorId': advisorId,
+        },
+        requiresAuth: true,
+      );
+      final bool ok = response is Map && (response['success'] == true || response['isSuccess'] == true);
+      return AcceptChatResult(success: ok);
+    } catch (_) {
+      return AcceptChatResult(success: false);
+    }
+  }
+
+  /// Advisor rejects a voice call via api/VoiceCall/reject
+  Future<bool> rejectVoiceCall({required String requestId, required String advisorId, String reason = "Rejected"}) async {
+    try {
+      await ApiClient.post(
+        ApiEndpoints.rejectVoiceCall,
+        body: {
+          'requestId': requestId,
+          'advisorId': advisorId,
+          'reason': reason,
+        },
+        requiresAuth: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Advisor rejects a video call via api/Video/reject
+  Future<bool> rejectVideoCall({required String requestId, required String advisorId, String reason = "Rejected"}) async {
+    try {
+      await ApiClient.post(
+        ApiEndpoints.rejectVideoCall,
+        body: {
+          'requestId': requestId,
+          'advisorId': advisorId,
+          'reason': reason,
+        },
+        requiresAuth: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Ends a voice call session via api/VoiceCall/end
+  Future<bool> endVoiceCall({required String requestId, String reason = "Ended"}) async {
+    try {
+      await ApiClient.post(
+        ApiEndpoints.endVoiceCall,
+        body: {
+          'requestId': requestId,
+          'reason': reason,
+        },
+        requiresAuth: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Ends a video call session via api/Video/end
+  Future<bool> endVideoCall({required String requestId, String reason = "Ended"}) async {
+    try {
+      await ApiClient.post(
+        ApiEndpoints.endVideoCall,
+        body: {
+          'requestId': requestId,
+          'reason': reason,
+        },
+        requiresAuth: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetches final voice call session summary via api/VoiceCall/summary/{requestId}
+  Future<Map<String, dynamic>?> getVoiceCallSummary(String requestId) async {
+    try {
+      final endpoint = "${ApiEndpoints.voiceSummary}/$requestId";
+      final response = await ApiClient.get(endpoint, requiresAuth: true);
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches final video call session summary via api/Video/summary/{requestId}
+  Future<Map<String, dynamic>?> getVideoCallSummary(String requestId) async {
+    try {
+      final endpoint = "${ApiEndpoints.videoSummary}/$requestId";
+      final response = await ApiClient.get(endpoint, requiresAuth: true);
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches Twilio audio token via api/twilio/get-audio-token
+  Future<String?> getAudioToken({required String userId, required String roomName}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.getAudioToken,
+        body: {'userId': userId, 'roomName': roomName},
+        requiresAuth: true,
+      );
+      if (response is Map && response.containsKey('token')) {
+        return response['token']?.toString();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches Twilio video token via api/twilio/get-token
+  Future<String?> getVideoToken({required String userId, required String roomName}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.getVideoToken,
+        body: {'userId': userId, 'roomName': roomName},
+        requiresAuth: true,
+      );
+      if (response is Map && response.containsKey('token')) {
+        return response['token']?.toString();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

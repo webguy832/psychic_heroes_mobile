@@ -194,6 +194,32 @@ class SessionProvider extends ChangeNotifier {
       _sessionState = SessionState.active;
       notifyListeners();
     }));
+
+    // 7. Real-time billing tick from backend (parity with ChatRealtimeService)
+    _signalRSubs.add(_signalR.billingTickStream.listen((data) {
+      _handleBillingTick(data);
+    }));
+  }
+
+  void _handleBillingTick(Map<String, dynamic> data) {
+    final reqId = data['requestId']?.toString() ?? data['RequestId']?.toString();
+    if (_activeRequest != null && reqId != null && _activeRequest!.id != reqId) return;
+
+    final elapsed = data['elapsedSeconds'] ?? data['ElapsedSeconds'];
+    if (elapsed is num && elapsed > 0) {
+      _elapsedSeconds = elapsed.toInt();
+    }
+    final remaining = data['remainingBalance'] ?? data['RemainingBalance'];
+    if (remaining is num) {
+      _userBalance = remaining.toDouble();
+    }
+    final balanceOver = data['balanceOver'] == true || data['BalanceOver'] == true;
+    if (balanceOver) {
+      if (!_isCurrentUserAdvisor) {
+        _putChatOnHold();
+      }
+    }
+    notifyListeners();
   }
 
   @override
@@ -307,8 +333,15 @@ class SessionProvider extends ChangeNotifier {
     _waitingSecondsLeft = 60;
     notifyListeners();
 
-    // Call ChatService.startChat(advisorId)
-    final startResult = await _chatService.startChat(advisorId);
+    // Call ChatService for Voice Call / Video Call / Chat
+    final StartChatResult startResult;
+    if (type == SessionType.call) {
+      startResult = await _chatService.startVoiceCall(advisorId: advisorId, customerId: clientId);
+    } else if (type == SessionType.video) {
+      startResult = await _chatService.startVideoCall(advisorId: advisorId, customerId: clientId);
+    } else {
+      startResult = await _chatService.startChat(advisorId);
+    }
 
     if (startResult.noBalance) {
       _sessionState = SessionState.noBalance;
@@ -1019,7 +1052,20 @@ class SessionProvider extends ChangeNotifier {
     }
     if (connId.isEmpty) connId = 'mobile';
 
-    final acceptResult = await _chatService.acceptChat(req.id, connectId: connId);
+    final AcceptChatResult acceptResult;
+    if (req.type == SessionType.call) {
+      acceptResult = await _chatService.acceptVoiceCall(
+        requestId: req.id,
+        advisorId: _currentUserId,
+      );
+    } else if (req.type == SessionType.video) {
+      acceptResult = await _chatService.acceptVideoCall(
+        requestId: req.id,
+        advisorId: _currentUserId,
+      );
+    } else {
+      acceptResult = await _chatService.acceptChat(req.id, connectId: connId);
+    }
     req.isAccepted = true;
 
     // Dynamically update ratePerMinute and free minutes from backend AcceptChat response
@@ -1081,7 +1127,20 @@ class SessionProvider extends ChangeNotifier {
       return;
     }
 
-    await _chatService.cancelChat(req.id);
+    if (req.type == SessionType.call) {
+      await _chatService.rejectVoiceCall(
+        requestId: req.id,
+        advisorId: _currentAdvisorProfileId ?? req.advisorId,
+      );
+    } else if (req.type == SessionType.video) {
+      await _chatService.rejectVideoCall(
+        requestId: req.id,
+        advisorId: _currentAdvisorProfileId ?? req.advisorId,
+      );
+    } else {
+      await _chatService.cancelChat(req.id);
+    }
+
     if (_activeRequest?.id == req.id) {
       _activeRequest = null;
       _sessionState = SessionState.cancelled;
@@ -1097,7 +1156,13 @@ class SessionProvider extends ChangeNotifier {
     }
     _stopAllTimers();
     if (reqId != null && !reqId.startsWith("req_")) {
-      await _chatService.cancelChat(reqId);
+      if (_sessionType == SessionType.call) {
+        await _chatService.rejectVoiceCall(requestId: reqId, advisorId: _activeRequest?.advisorId ?? '');
+      } else if (_sessionType == SessionType.video) {
+        await _chatService.rejectVideoCall(requestId: reqId, advisorId: _activeRequest?.advisorId ?? '');
+      } else {
+        await _chatService.cancelChat(reqId);
+      }
     }
     _incomingRequests.clear();
     _activeRequest = null;
@@ -1122,12 +1187,22 @@ class SessionProvider extends ChangeNotifier {
     if (reqId != null && !reqId.startsWith("req_")) {
       // Notify over SignalR and settle billing
       _signalR.endChat(reqId, totalSecs);
-      await _chatService.endChatSession(reqId, totalSecs, connectionId: _signalR.connectionId);
-      _chatSummary = await _chatService.getSessionSummary(reqId);
+      if (_sessionType == SessionType.call) {
+        await _chatService.endVoiceCall(requestId: reqId, durationSeconds: totalSecs);
+        _chatSummary = await _chatService.getVoiceCallSummary(reqId);
+      } else if (_sessionType == SessionType.video) {
+        await _chatService.endVideoCall(requestId: reqId, durationSeconds: totalSecs);
+        _chatSummary = await _chatService.getVideoCallSummary(reqId);
+      } else {
+        await _chatService.endChatSession(reqId, totalSecs, connectionId: _signalR.connectionId);
+        _chatSummary = await _chatService.getSessionSummary(reqId);
+      }
       if (_chatSummary != null) {
         final finalCharge = _chatSummary!['chargedAmount'] ??
             _chatSummary!['ChargedAmount'] ??
-            _chatSummary!['totalCharges'];
+            _chatSummary!['totalCharges'] ??
+            _chatSummary!['TotalCharges'] ??
+            _chatSummary!['charges'];
         if (finalCharge is num && _activeRequest != null) {
           _totalEarningsToday = _totalEarningsToday - currentSessionCost + finalCharge.toDouble();
         }
