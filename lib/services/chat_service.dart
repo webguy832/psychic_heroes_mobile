@@ -580,4 +580,25 @@ class ChatService {
       return null;
     }
   }
+
+  /// Fetches Twilio Video Room token via api/video/token (exact parity with Angular CallRoomComponent)
+  Future<String?> getVideoRoomToken({required String identity, required String roomName}) async {
+    try {
+      final response = await ApiClient.post(
+        ApiEndpoints.getVideoRoomToken,
+        body: {'identity': identity, 'roomName': roomName},
+        requiresAuth: true,
+      );
+      if (response is Map) {
+        if (response.containsKey('token')) {
+          return response['token']?.toString();
+        } else if (response.containsKey('Token')) {
+          return response['Token']?.toString();
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

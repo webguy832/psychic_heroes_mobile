@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/chat_service.dart';
+import '../../services/twilio_call_service.dart';
 import 'session_after_summary_screen.dart';
 
 class VoiceCallScreen extends StatefulWidget {
@@ -27,6 +29,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
   double _speakerVolume = 100.0;
   late AnimationController _waveAnimController;
 
+  bool _isCallConnected = false;
+  bool _callConnecting = true;
+  bool _remoteParticipantJoined = false;
+  String _callStatusText = "Connecting audio call...";
+  double _currentMicLevel = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +45,98 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initSessionChat();
+      _startTwilioVoiceCall();
     });
+  }
+
+  Future<void> _startTwilioVoiceCall() async {
+    final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+    final user = Provider.of<UserProvider>(context, listen: false).user;
+    final activeReq = sessionProv.activeRequest;
+    if (activeReq == null) return;
+
+    final identity = widget.isAdvisorView
+        ? (activeReq.advisorName.isNotEmpty ? activeReq.advisorName : (user?.displayName ?? 'Advisor'))
+        : (activeReq.clientName.isNotEmpty ? activeReq.clientName : (user?.displayName ?? 'Client'));
+
+    final roomName = activeReq.id;
+
+    setState(() {
+      _callConnecting = true;
+      _callStatusText = "Connecting to Twilio Voice...";
+    });
+
+    try {
+      final token = await ChatService().getVideoRoomToken(
+        identity: identity,
+        roomName: roomName,
+      );
+
+      if (!mounted) return;
+
+      if (token == null || token.isEmpty) {
+        setState(() {
+          _callConnecting = false;
+          _callStatusText = "Failed to obtain voice token.";
+        });
+        return;
+      }
+
+      TwilioCallService.startCall(
+        token: token,
+        roomName: roomName,
+        isAudioOnly: true,
+        onConnected: (rName) {
+          if (!mounted) return;
+          setState(() {
+            _isCallConnected = true;
+            _callConnecting = false;
+            _callStatusText = "HD Voice Connected · Twilio Opus 48kHz";
+          });
+          sessionProv.signalR.markVoiceConnected(roomName);
+        },
+        onDisconnected: () {
+          if (!mounted) return;
+          setState(() {
+            _isCallConnected = false;
+            _callStatusText = "Call Disconnected";
+          });
+        },
+        onParticipantConnected: (id) {
+          if (!mounted) return;
+          setState(() {
+            _remoteParticipantJoined = true;
+            _callStatusText = "Connected · Twilio Opus 48kHz";
+          });
+        },
+        onParticipantDisconnected: (id) {
+          if (!mounted) return;
+          setState(() {
+            _remoteParticipantJoined = false;
+            _callStatusText = "Participant Left the Call";
+          });
+        },
+        onMicLevel: (lvl) {
+          if (!mounted) return;
+          setState(() {
+            _currentMicLevel = lvl;
+          });
+        },
+        onError: (err) {
+          if (!mounted) return;
+          setState(() {
+            _callConnecting = false;
+            _callStatusText = "Call Error: $err";
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _callConnecting = false;
+        _callStatusText = "Connection error: $e";
+      });
+    }
   }
 
   void _initSessionChat() async {
@@ -59,6 +158,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    TwilioCallService.endCall();
     _waveAnimController.dispose();
     _msgController.dispose();
     _scrollController.dispose();
@@ -80,6 +180,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
   void _checkAutoClose(SessionProvider sessionProv, String titleName) {
     if (sessionProv.sessionState == SessionState.ended && !_handledSessionEnd) {
       _handledSessionEnd = true;
+      TwilioCallService.endCall();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -424,12 +525,20 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
                     // HD Voice Connected Status
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.verified_rounded, color: AppColors.onlineGreen, size: 14),
-                        SizedBox(width: 4),
+                      children: [
+                        Icon(
+                          _isCallConnected ? Icons.verified_rounded : Icons.sync_rounded,
+                          color: _isCallConnected ? AppColors.onlineGreen : AppColors.accentGold,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          "HD Voice Connected · Twilio Opus 48kHz",
-                          style: TextStyle(fontSize: 12, color: AppColors.onlineGreen, fontWeight: FontWeight.w600),
+                          _callStatusText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _isCallConnected ? AppColors.onlineGreen : AppColors.accentGold,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -454,10 +563,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: List.generate(9, (index) {
                                   final double offset = math.sin((index + 1) * 0.8 + (v * math.pi));
-                                  final double barHeight = sessionProv.isMuted ? 6.0 : (10.0 + (offset.abs() * 26.0));
+                                  final double speechBoost = sessionProv.isMuted ? 0.0 : (_currentMicLevel * 24.0);
+                                  final double barHeight = sessionProv.isMuted ? 6.0 : (8.0 + (offset.abs() * 18.0) + speechBoost);
                                   return Container(
                                     width: 4,
-                                    height: barHeight,
+                                    height: barHeight.clamp(6.0, 48.0),
                                     margin: const EdgeInsets.symmetric(horizontal: 3),
                                     decoration: BoxDecoration(
                                       color: sessionProv.isMuted
@@ -517,6 +627,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
                                 max: 100,
                                 onChanged: (val) {
                                   setState(() => _speakerVolume = val);
+                                  TwilioCallService.setVolume(_speakerVolume);
                                 },
                               ),
                             ),
@@ -567,7 +678,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
                             sessionProv.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
                             color: sessionProv.isMuted ? AppColors.errorRed : AppColors.accentGold,
                           ),
-                          onPressed: () => sessionProv.toggleMute(),
+                          onPressed: () {
+                            sessionProv.toggleMute();
+                            TwilioCallService.toggleAudio(!sessionProv.isMuted);
+                          },
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -837,6 +951,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
             child: const Text("End Call", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             onPressed: () async {
+              TwilioCallService.endCall();
               final durationStr = sessionProv.formattedTimer;
               final costVal = sessionProv.currentSessionCost;
               Navigator.pop(ctx);

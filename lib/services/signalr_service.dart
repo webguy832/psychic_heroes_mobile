@@ -547,6 +547,24 @@ class SignalRService {
     await invoke('ConnectAdvisor', [userName, connectTo, requestId]);
   }
 
+  /// Notify backend that WebRTC / Twilio Voice media is connected
+  Future<void> markVoiceConnected(String requestId) async {
+    try {
+      await invoke('MarkVoiceConnected', [requestId]);
+    } catch (e) {
+      debugPrint("Failed to invoke MarkVoiceConnected: $e");
+    }
+  }
+
+  /// Notify backend that WebRTC / Twilio Video media is connected
+  Future<void> markVideoConnected(String requestId) async {
+    try {
+      await invoke('MarkVideoConnected', [requestId]);
+    } catch (e) {
+      debugPrint("Failed to invoke MarkVideoConnected: $e");
+    }
+  }
+
   /// Send chat message in real-time over SignalR (triggers instant push to opponent)
   Future<void> sendChatMessage({
     required String message,

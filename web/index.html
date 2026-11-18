@@ -184,6 +184,376 @@
       };
     })();
   </script>
+
+  <!-- Twilio Video WebRTC SDK for Audio & Video Calling (Matching Angular CallRoomComponent) -->
+  <script src="https://sdk.twilio.com/js/video/releases/2.28.1/twilio-video.min.js"></script>
+  <script>
+    (function() {
+      var activeRoom = null;
+      var localTracks = [];
+      var localAudioTrack = null;
+      var localVideoTrack = null;
+      var remoteAudioElements = {};
+      var micLevelInterval = null;
+      var isAudioEnabled = true;
+      var isVideoEnabled = true;
+      var currentFacingMode = 'user';
+      var audioCtx = null;
+      var analyser = null;
+      var micSource = null;
+
+      var currentRemoteVideoTrack = null;
+      var currentLocalVideoTrack = null;
+
+      function cleanup() {
+        if (micLevelInterval) {
+          clearInterval(micLevelInterval);
+          micLevelInterval = null;
+        }
+        if (audioCtx) {
+          try { audioCtx.close(); } catch(e) {}
+          audioCtx = null;
+          analyser = null;
+          micSource = null;
+        }
+        if (activeRoom) {
+          try {
+            activeRoom.disconnect();
+          } catch (e) {
+            console.warn('[TwilioCallManager] Disconnect error:', e);
+          }
+          activeRoom = null;
+        }
+        if (localTracks && localTracks.length > 0) {
+          localTracks.forEach(function(track) {
+            try {
+              track.stop();
+            } catch (e) {}
+          });
+          localTracks = [];
+        }
+        localAudioTrack = null;
+        localVideoTrack = null;
+        currentRemoteVideoTrack = null;
+        currentLocalVideoTrack = null;
+        for (var key in remoteAudioElements) {
+          var el = remoteAudioElements[key];
+          if (el && el.parentNode) {
+            el.srcObject = null;
+            el.parentNode.removeChild(el);
+          }
+        }
+        remoteAudioElements = {};
+        var remoteContainer = document.getElementById('twilio-remote-video');
+        if (remoteContainer) remoteContainer.innerHTML = '';
+        var localContainer = document.getElementById('twilio-local-pip');
+        if (localContainer) localContainer.innerHTML = '';
+      }
+
+      function attachTrack(track, identity) {
+        if (track.kind === 'audio') {
+          console.log('[TwilioCallManager] Attaching audio track from', identity);
+          var audioId = 'twilio-audio-' + identity;
+          var existing = document.getElementById(audioId);
+          if (existing && existing.parentNode) {
+            existing.srcObject = null;
+            existing.parentNode.removeChild(existing);
+          }
+          var audioEl = track.attach();
+          audioEl.id = audioId;
+          audioEl.autoplay = true;
+          audioEl.style.display = 'none';
+          document.body.appendChild(audioEl);
+          remoteAudioElements[identity] = audioEl;
+          var p = audioEl.play();
+          if (p !== undefined) {
+            p.catch(function(err) {
+              console.warn('[TwilioCallManager] Remote audio play error:', err);
+            });
+          }
+        } else if (track.kind === 'video') {
+          console.log('[TwilioCallManager] Attaching remote video track from', identity);
+          currentRemoteVideoTrack = track;
+          function mountRemoteVideo() {
+            var container = document.getElementById('twilio-remote-video');
+            if (container) {
+              container.innerHTML = '';
+              var vid = track.attach();
+              vid.setAttribute('playsinline', 'true');
+              vid.setAttribute('webkit-playsinline', 'true');
+              vid.autoplay = true;
+              vid.style.width = '100%';
+              vid.style.height = '100%';
+              vid.style.objectFit = 'cover';
+              container.appendChild(vid);
+              return true;
+            }
+            return false;
+          }
+          if (!mountRemoteVideo()) {
+            var retries = 0;
+            var timer = setInterval(function() {
+              retries++;
+              if (mountRemoteVideo() || retries > 60) {
+                clearInterval(timer);
+              }
+            }, 100);
+          }
+        }
+      }
+
+      function detachTrack(track, identity) {
+        if (track.kind === 'audio') {
+          var el = remoteAudioElements[identity];
+          if (el && el.parentNode) {
+            el.srcObject = null;
+            el.parentNode.removeChild(el);
+          }
+          delete remoteAudioElements[identity];
+        } else if (track.kind === 'video') {
+          if (currentRemoteVideoTrack === track) currentRemoteVideoTrack = null;
+          var container = document.getElementById('twilio-remote-video');
+          if (container) container.innerHTML = '';
+        }
+      }
+
+      function setupParticipant(participant, onParticipantConnected) {
+        console.log('[TwilioCallManager] Setting up participant:', participant.identity);
+        if (onParticipantConnected) onParticipantConnected(participant.identity);
+
+        participant.tracks.forEach(function(pub) {
+          if (pub.isSubscribed && pub.track) {
+            attachTrack(pub.track, participant.identity);
+          }
+        });
+
+        participant.on('trackSubscribed', function(track) {
+          attachTrack(track, participant.identity);
+        });
+
+        participant.on('trackUnsubscribed', function(track) {
+          detachTrack(track, participant.identity);
+        });
+      }
+
+      window.TwilioCallManager = {
+        startCall: function(token, roomName, isAudioOnly, callbacks) {
+          cleanup();
+          unlockAudioContext();
+          isAudioEnabled = true;
+          isVideoEnabled = !isAudioOnly;
+
+          if (!window.Twilio || !window.Twilio.Video) {
+            console.error('[TwilioCallManager] Twilio Video SDK not loaded');
+            if (callbacks && callbacks.onError) callbacks.onError('Twilio Video SDK not loaded');
+            return;
+          }
+
+          console.log('[TwilioCallManager] Initializing call - roomName:', roomName, 'isAudioOnly:', isAudioOnly);
+
+          var trackOptions = {
+            audio: true,
+            video: isAudioOnly ? false : { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }
+          };
+
+          window.Twilio.Video.createLocalTracks(trackOptions).catch(function(err) {
+            console.warn('[TwilioCallManager] createLocalTracks with video failed, falling back to audio-only:', err);
+            return window.Twilio.Video.createLocalTracks({ audio: true, video: false });
+          }).then(function(tracks) {
+            localTracks = tracks;
+            localAudioTrack = tracks.find(function(t) { return t.kind === 'audio'; });
+            localVideoTrack = tracks.find(function(t) { return t.kind === 'video'; });
+
+            // Attach local video track to PIP window if video call
+            if (localVideoTrack) {
+              currentLocalVideoTrack = localVideoTrack;
+              function mountLocalPip() {
+                var pip = document.getElementById('twilio-local-pip');
+                if (pip) {
+                  pip.innerHTML = '';
+                  var localVid = localVideoTrack.attach();
+                  localVid.muted = true;
+                  localVid.setAttribute('playsinline', 'true');
+                  localVid.setAttribute('webkit-playsinline', 'true');
+                  localVid.autoplay = true;
+                  localVid.style.width = '100%';
+                  localVid.style.height = '100%';
+                  localVid.style.objectFit = 'cover';
+                  pip.appendChild(localVid);
+                  return true;
+                }
+                return false;
+              }
+              if (!mountLocalPip()) {
+                var pipRetries = 0;
+                var pipTimer = setInterval(function() {
+                  pipRetries++;
+                  if (mountLocalPip() || pipRetries > 60) {
+                    clearInterval(pipTimer);
+                  }
+                }, 100);
+              }
+            }
+
+            // Real mic level analyzer for live audio visualizer
+            if (localAudioTrack && localAudioTrack.mediaStreamTrack) {
+              try {
+                var stream = new MediaStream([localAudioTrack.mediaStreamTrack]);
+                var AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                  audioCtx = new AudioCtx();
+                  analyser = audioCtx.createAnalyser();
+                  analyser.fftSize = 256;
+                  micSource = audioCtx.createMediaStreamSource(stream);
+                  micSource.connect(analyser);
+                  var buffer = new Uint8Array(analyser.frequencyBinCount);
+
+                  micLevelInterval = setInterval(function() {
+                    if (!analyser) return;
+                    analyser.getByteFrequencyData(buffer);
+                    var sum = 0;
+                    for (var i = 0; i < buffer.length; i++) sum += buffer[i];
+                    var avg = sum / buffer.length;
+                    var lvl = Math.min(1.0, avg / 60.0);
+                    if (callbacks && callbacks.onMicLevel) callbacks.onMicLevel(lvl);
+                  }, 100);
+                }
+              } catch (e) {
+                console.warn('[TwilioCallManager] AudioContext analyser error:', e);
+              }
+            }
+
+            // Connect to Twilio Room
+            return window.Twilio.Video.connect(token, {
+              name: roomName,
+              tracks: localTracks,
+              dominantSpeaker: true,
+              networkQuality: { local: 1, remote: 1 }
+            });
+          }).then(function(room) {
+            activeRoom = room;
+            console.log('[TwilioCallManager] Successfully connected to Twilio room:', room.name);
+            if (callbacks && callbacks.onConnected) callbacks.onConnected(room.name);
+
+            room.participants.forEach(function(participant) {
+              setupParticipant(participant, callbacks && callbacks.onParticipantConnected);
+            });
+
+            room.on('participantConnected', function(participant) {
+              setupParticipant(participant, callbacks && callbacks.onParticipantConnected);
+            });
+
+            room.on('participantDisconnected', function(participant) {
+              console.log('[TwilioCallManager] Participant disconnected:', participant.identity);
+              if (callbacks && callbacks.onParticipantDisconnected) callbacks.onParticipantDisconnected(participant.identity);
+              detachTrack({ kind: 'audio' }, participant.identity);
+              detachTrack({ kind: 'video' }, participant.identity);
+            });
+
+            room.on('disconnected', function() {
+              console.log('[TwilioCallManager] Disconnected from room');
+              if (callbacks && callbacks.onDisconnected) callbacks.onDisconnected();
+              cleanup();
+            });
+
+          }).catch(function(err) {
+            console.error('[TwilioCallManager] startCall error:', err);
+            if (callbacks && callbacks.onError) callbacks.onError(err.message || String(err));
+          });
+        },
+
+        toggleAudio: function(enable) {
+          isAudioEnabled = (enable !== undefined) ? enable : !isAudioEnabled;
+          if (localAudioTrack) {
+            if (isAudioEnabled) {
+              localAudioTrack.enable();
+            } else {
+              localAudioTrack.disable();
+            }
+          }
+          return isAudioEnabled;
+        },
+
+        toggleVideo: function(enable) {
+          isVideoEnabled = (enable !== undefined) ? enable : !isVideoEnabled;
+          if (localVideoTrack) {
+            if (isVideoEnabled) {
+              localVideoTrack.enable();
+            } else {
+              localVideoTrack.disable();
+            }
+          }
+          return isVideoEnabled;
+        },
+
+        switchCamera: function() {
+          if (!localVideoTrack || !activeRoom) return;
+          currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+          localVideoTrack.restart({ width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode })
+            .then(function() {
+              var pip = document.getElementById('twilio-local-pip');
+              if (pip) {
+                pip.innerHTML = '';
+                var localVid = localVideoTrack.attach();
+                localVid.muted = true;
+                localVid.setAttribute('playsinline', 'true');
+                localVid.setAttribute('webkit-playsinline', 'true');
+                localVid.autoplay = true;
+                localVid.style.width = '100%';
+                localVid.style.height = '100%';
+                localVid.style.objectFit = 'cover';
+                pip.appendChild(localVid);
+              }
+            }).catch(function(err) {
+              console.warn('[TwilioCallManager] switchCamera error:', err);
+            });
+        },
+
+        remountVideo: function() {
+          if (localVideoTrack) {
+            var pip = document.getElementById('twilio-local-pip');
+            if (pip && pip.children.length === 0) {
+              var localVid = localVideoTrack.attach();
+              localVid.muted = true;
+              localVid.setAttribute('playsinline', 'true');
+              localVid.setAttribute('webkit-playsinline', 'true');
+              localVid.autoplay = true;
+              localVid.style.width = '100%';
+              localVid.style.height = '100%';
+              localVid.style.objectFit = 'cover';
+              pip.appendChild(localVid);
+            }
+          }
+          if (currentRemoteVideoTrack) {
+            var container = document.getElementById('twilio-remote-video');
+            if (container && container.children.length === 0) {
+              var vid = currentRemoteVideoTrack.attach();
+              vid.setAttribute('playsinline', 'true');
+              vid.setAttribute('webkit-playsinline', 'true');
+              vid.autoplay = true;
+              vid.style.width = '100%';
+              vid.style.height = '100%';
+              vid.style.objectFit = 'cover';
+              container.appendChild(vid);
+            }
+          }
+        },
+
+        setVolume: function(percent) {
+          var vol = Math.max(0, Math.min(100, percent)) / 100;
+          for (var id in remoteAudioElements) {
+            if (remoteAudioElements[id]) {
+              remoteAudioElements[id].volume = vol;
+            }
+          }
+        },
+
+        endCall: function() {
+          cleanup();
+        }
+      };
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js?v=20261104_1800" async></script>

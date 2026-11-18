@@ -1,9 +1,12 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/chat_service.dart';
+import '../../services/twilio_call_service.dart';
 import 'session_after_summary_screen.dart';
 
 class VideoCallScreen extends StatefulWidget {
@@ -27,9 +30,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
   bool _handledSessionEnd = false;
   late AnimationController _pulseController;
 
+  bool _isCallConnected = false;
+  bool _callConnecting = true;
+  bool _remoteParticipantConnected = false;
+  String _callStatusText = "Connecting video call...";
+
   @override
   void initState() {
     super.initState();
+    TwilioCallService.registerViews();
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -37,7 +47,98 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initSessionChat();
+      _startTwilioVideoCall();
     });
+  }
+
+  Future<void> _startTwilioVideoCall() async {
+    final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+    final user = Provider.of<UserProvider>(context, listen: false).user;
+    final activeReq = sessionProv.activeRequest;
+    if (activeReq == null) return;
+
+    final identity = widget.isAdvisorView
+        ? (activeReq.advisorName.isNotEmpty ? activeReq.advisorName : (user?.displayName ?? 'Advisor'))
+        : (activeReq.clientName.isNotEmpty ? activeReq.clientName : (user?.displayName ?? 'Client'));
+
+    final roomName = activeReq.id;
+
+    setState(() {
+      _callConnecting = true;
+      _callStatusText = "Connecting to Twilio Video...";
+    });
+
+    try {
+      final token = await ChatService().getVideoRoomToken(
+        identity: identity,
+        roomName: roomName,
+      );
+
+      if (!mounted) return;
+
+      if (token == null || token.isEmpty) {
+        setState(() {
+          _callConnecting = false;
+          _callStatusText = "Failed to obtain video token.";
+        });
+        return;
+      }
+
+      TwilioCallService.startCall(
+        token: token,
+        roomName: roomName,
+        isAudioOnly: false,
+        onConnected: (rName) {
+          if (!mounted) return;
+          setState(() {
+            _isCallConnected = true;
+            _callConnecting = false;
+            _callStatusText = "HD Video Connected";
+          });
+          sessionProv.signalR.markVideoConnected(roomName);
+          Future.delayed(const Duration(milliseconds: 300), () {
+            TwilioCallService.remountVideo();
+          });
+        },
+        onDisconnected: () {
+          if (!mounted) return;
+          setState(() {
+            _isCallConnected = false;
+            _callStatusText = "Call Disconnected";
+          });
+        },
+        onParticipantConnected: (id) {
+          if (!mounted) return;
+          setState(() {
+            _remoteParticipantConnected = true;
+            _callStatusText = "Connected · Twilio HD Video";
+          });
+          Future.delayed(const Duration(milliseconds: 300), () {
+            TwilioCallService.remountVideo();
+          });
+        },
+        onParticipantDisconnected: (id) {
+          if (!mounted) return;
+          setState(() {
+            _remoteParticipantConnected = false;
+            _callStatusText = "Participant Left Video Call";
+          });
+        },
+        onError: (err) {
+          if (!mounted) return;
+          setState(() {
+            _callConnecting = false;
+            _callStatusText = "Video Call Error: $err";
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _callConnecting = false;
+        _callStatusText = "Connection error: $e";
+      });
+    }
   }
 
   void _initSessionChat() async {
@@ -59,6 +160,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    TwilioCallService.endCall();
     _pulseController.dispose();
     _msgController.dispose();
     _scrollController.dispose();
@@ -80,6 +182,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
   void _checkAutoClose(SessionProvider sessionProv, String titleName) {
     if (sessionProv.sessionState == SessionState.ended && !_handledSessionEnd) {
       _handledSessionEnd = true;
+      TwilioCallService.endCall();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -150,114 +253,147 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Grid subtle pattern frame
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: AppColors.accentCyan.withOpacity(0.15), width: 1.5),
-                              ),
+                          // Live Remote Twilio Video View
+                          if (kIsWeb)
+                            const Positioned.fill(
+                              child: HtmlElementView(viewType: 'twilio-remote-video-view'),
                             ),
-                          ),
 
-                          // Central Speaker Visualizer & Avatar
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedBuilder(
-                                animation: _pulseController,
-                                builder: (context, _) {
-                                  final pulse = sessionProv.isMuted ? 0.0 : _pulseController.value;
-                                  return Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      // Active Speaker Glowing Ring
-                                      Container(
-                                        width: 140 + (pulse * 20),
-                                        height: 140 + (pulse * 20),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: AppColors.accentCyan.withOpacity(0.08 + (pulse * 0.08)),
-                                          border: Border.all(
-                                            color: AppColors.accentCyan.withOpacity(0.3 + (pulse * 0.3)),
-                                            width: 2,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: AppColors.accentCyan.withOpacity(0.25 + (pulse * 0.2)),
-                                              blurRadius: 24,
-                                              spreadRadius: 4,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      CircleAvatar(
-                                        radius: 54,
-                                        backgroundColor: const Color(0xFF4C1D95),
-                                        child: Text(
-                                          titleName.isNotEmpty ? titleName[0].toUpperCase() : 'V',
-                                          style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold, color: Colors.white),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        bottom: 4,
-                                        right: 4,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.onlineGreen,
+                          // If remote participant video is not yet connected, show placeholder avatar & status
+                          if (!_remoteParticipantConnected) ...[
+                            // Central Speaker Visualizer & Avatar
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                AnimatedBuilder(
+                                  animation: _pulseController,
+                                  builder: (context, _) {
+                                    final pulse = sessionProv.isMuted ? 0.0 : _pulseController.value;
+                                    return Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        // Active Speaker Glowing Ring
+                                        Container(
+                                          width: 140 + (pulse * 20),
+                                          height: 140 + (pulse * 20),
+                                          decoration: BoxDecoration(
                                             shape: BoxShape.circle,
+                                            color: AppColors.accentCyan.withOpacity(0.08 + (pulse * 0.08)),
+                                            border: Border.all(
+                                              color: AppColors.accentCyan.withOpacity(0.3 + (pulse * 0.3)),
+                                              width: 2,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppColors.accentCyan.withOpacity(0.25 + (pulse * 0.2)),
+                                                blurRadius: 24,
+                                                spreadRadius: 4,
+                                              ),
+                                            ],
                                           ),
-                                          child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 14),
                                         ),
+                                        CircleAvatar(
+                                          radius: 54,
+                                          backgroundColor: const Color(0xFF4C1D95),
+                                          child: Text(
+                                            titleName.isNotEmpty ? titleName[0].toUpperCase() : 'V',
+                                            style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          bottom: 4,
+                                          right: 4,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.onlineGreen,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 14),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+
+                                const SizedBox(height: 18),
+
+                                // Name & Connection Status tag
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: _isCallConnected ? AppColors.onlineGreen : AppColors.accentGold,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "$titleName · $_callStatusText",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                // Twilio Video Encrypted Stream Badge (Web App Parity)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.accentCyan.withOpacity(0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.hd_rounded, color: AppColors.accentCyan, size: 14),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        "1080p HD · 60 FPS · WebRTC Opus/H.264",
+                                        style: TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
                                       ),
                                     ],
-                                  );
-                                },
-                              ),
-
-                              const SizedBox(height: 18),
-
-                              // Name & Live HD Stream tag
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle),
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    "$titleName (Live HD Video)",
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
+                            ),
+                          ],
 
-                              const SizedBox(height: 8),
-
-                              // Twilio Video Encrypted Stream Badge (Web App Parity)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          // Overlay tag when remote participant is connected
+                          if (_remoteParticipantConnected)
+                            Positioned(
+                              bottom: 90,
+                              left: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.accentCyan.withOpacity(0.3)),
+                                  color: Colors.black.withOpacity(0.65),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withOpacity(0.15)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.hd_rounded, color: AppColors.accentCyan, size: 14),
-                                    SizedBox(width: 4),
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(color: AppColors.onlineGreen, shape: BoxShape.circle),
+                                    ),
+                                    const SizedBox(width: 6),
                                     Text(
-                                      "1080p HD · 60 FPS · WebRTC Opus/H.264",
-                                      style: TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                                      "$titleName (Live HD)",
+                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
                         ],
                       ),
                     )
@@ -431,8 +567,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
               top: 80,
               right: 14,
               child: Container(
-                width: 95,
-                height: 130,
+                width: 105,
+                height: 145,
                 decoration: BoxDecoration(
                   color: sessionProv.isVideoOn ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
                   borderRadius: BorderRadius.circular(14),
@@ -448,44 +584,40 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
                   alignment: Alignment.center,
                   children: [
                     if (sessionProv.isVideoOn) ...[
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.accentGold, width: 1.5)),
-                            child: const CircleAvatar(
-                              radius: 18,
-                              backgroundColor: AppColors.accentPurple,
-                              child: Icon(Icons.person_rounded, color: Colors.white, size: 20),
-                            ),
+                      if (kIsWeb)
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
+                            child: const HtmlElementView(viewType: 'twilio-local-pip-view'),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user?.displayName ?? "You",
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.videocam_rounded, color: AppColors.accentCyan, size: 10),
-                              SizedBox(width: 2),
-                              Text("Self Cam", style: TextStyle(color: AppColors.accentCyan, fontSize: 8, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ],
-                      ),
+                        ),
                       Positioned(
                         top: 6,
                         right: 6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(4)),
                           child: Text(
                             _isFrontCamera ? "FRONT" : "BACK",
-                            style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.videocam_rounded, color: AppColors.accentCyan, size: 10),
+                              SizedBox(width: 3),
+                              Text("You", style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                            ],
                           ),
                         ),
                       ),
@@ -530,7 +662,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
                         color: sessionProv.isMuted ? AppColors.errorRed : AppColors.accentGold,
                       ),
                       tooltip: sessionProv.isMuted ? "Unmute" : "Mute",
-                      onPressed: () => sessionProv.toggleMute(),
+                      onPressed: () {
+                        sessionProv.toggleMute();
+                        TwilioCallService.toggleAudio(!sessionProv.isMuted);
+                      },
                     ),
 
                     // Toggle Camera Video Feed
@@ -541,7 +676,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
                         color: sessionProv.isVideoOn ? AppColors.accentCyan : Colors.grey,
                       ),
                       tooltip: sessionProv.isVideoOn ? "Stop Video" : "Start Video",
-                      onPressed: () => sessionProv.toggleVideo(),
+                      onPressed: () {
+                        sessionProv.toggleVideo();
+                        TwilioCallService.toggleVideo(sessionProv.isVideoOn);
+                        if (sessionProv.isVideoOn) {
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            TwilioCallService.remountVideo();
+                          });
+                        }
+                      },
                     ),
 
                     // Flip Camera (Front / Back)
@@ -554,6 +697,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
                       tooltip: "Flip Camera",
                       onPressed: () {
                         setState(() => _isFrontCamera = !_isFrontCamera);
+                        TwilioCallService.switchCamera();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(_isFrontCamera ? "Switched to Front Camera" : "Switched to Back Camera"),
@@ -772,6 +916,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> with SingleTickerProv
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
             child: const Text("End Video Call", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             onPressed: () async {
+              TwilioCallService.endCall();
               final durationStr = sessionProv.formattedTimer;
               final costVal = sessionProv.currentSessionCost;
               Navigator.pop(ctx);
