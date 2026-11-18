@@ -484,13 +484,14 @@ class ChatService {
   }
 
   /// Ends a voice call session via api/VoiceCall/end
-  Future<bool> endVoiceCall({required String requestId, String reason = "Ended"}) async {
+  Future<bool> endVoiceCall({required String requestId, int? durationSeconds, String reason = "Ended"}) async {
     try {
       await ApiClient.post(
         ApiEndpoints.endVoiceCall,
         body: {
           'requestId': requestId,
           'reason': reason,
+          if (durationSeconds != null) 'durationSeconds': durationSeconds,
         },
         requiresAuth: true,
       );
@@ -501,13 +502,14 @@ class ChatService {
   }
 
   /// Ends a video call session via api/Video/end
-  Future<bool> endVideoCall({required String requestId, String reason = "Ended"}) async {
+  Future<bool> endVideoCall({required String requestId, int? durationSeconds, String reason = "Ended"}) async {
     try {
       await ApiClient.post(
         ApiEndpoints.endVideoCall,
         body: {
           'requestId': requestId,
           'reason': reason,
+          if (durationSeconds != null) 'durationSeconds': durationSeconds,
         },
         requiresAuth: true,
       );
