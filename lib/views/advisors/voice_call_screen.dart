@@ -55,9 +55,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> with SingleTickerProv
     final activeReq = sessionProv.activeRequest;
     if (activeReq == null) return;
 
-    final identity = widget.isAdvisorView
-        ? (activeReq.advisorName.isNotEmpty ? activeReq.advisorName : (user?.displayName ?? 'Advisor'))
-        : (activeReq.clientName.isNotEmpty ? activeReq.clientName : (user?.displayName ?? 'Client'));
+    final String baseName = widget.isAdvisorView
+        ? (activeReq.advisorName.trim().isNotEmpty ? activeReq.advisorName.trim() : (user?.displayName?.trim() ?? 'Advisor'))
+        : (activeReq.clientName.trim().isNotEmpty ? activeReq.clientName.trim() : (user?.displayName?.trim() ?? 'Client'));
+    final identity = baseName.isNotEmpty ? baseName : (widget.isAdvisorView ? 'Advisor' : 'Client');
 
     final roomName = activeReq.id;
 
