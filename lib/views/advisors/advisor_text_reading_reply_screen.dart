@@ -96,13 +96,7 @@ class _AdvisorTextReadingReplyScreenState extends State<AdvisorTextReadingReplyS
       if (!mounted) return;
       _clarificationController.clear();
       _isRaiseQueryOpen = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Clarification query sent to customer."),
-          backgroundColor: AppColors.onlineGreen,
-        ),
-      );
-      await _loadDetails();
+      _showClarificationSentDialog();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -132,13 +126,7 @@ class _AdvisorTextReadingReplyScreenState extends State<AdvisorTextReadingReplyS
       if (!mounted) return;
       _isFinalSubmissionOpen = false;
       _isRaiseQueryOpen = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Final reading submitted successfully! Order completed."),
-          backgroundColor: AppColors.onlineGreen,
-        ),
-      );
-      await _loadDetails();
+      _showFinalReadingCompletedDialog();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -147,6 +135,155 @@ class _AdvisorTextReadingReplyScreenState extends State<AdvisorTextReadingReplyS
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _showFinalReadingCompletedDialog() {
+    final clientName = _textReading?.customerName.isNotEmpty == true ? _textReading!.customerName : "Customer";
+    final priceStr = _textReading != null ? "\$${_textReading!.price.toStringAsFixed(2)}" : "\$9.99";
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgDarkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.onlineGreen, width: 2),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.onlineGreen.withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.onlineGreen, width: 2),
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: AppColors.onlineGreen, size: 50),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              "Reading Completed!",
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Your final reading has been successfully delivered to $clientName. The order is now completed and $priceStr has been credited to your account.",
+              style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.onlineGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.black, size: 18),
+                label: const Text(
+                  "Return to Requests List",
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context, true);
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _loadDetails();
+              },
+              child: const Text(
+                "Stay & View Completed Reading",
+                style: TextStyle(color: AppColors.accentGold, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showClarificationSentDialog() {
+    final clientName = _textReading?.customerName.isNotEmpty == true ? _textReading!.customerName : "Customer";
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgDarkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.amber, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.amber, width: 2),
+              ),
+              child: const Icon(Icons.help_outline_rounded, color: Colors.amber, size: 44),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              "Clarification Query Sent!",
+              style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Your query has been sent to $clientName. The reading request remains in progress and you will be notified when they reply.",
+              style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFB45309), // Amber-700
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
+                label: const Text(
+                  "Back to Requests List",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context, true);
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _loadDetails();
+              },
+              child: const Text(
+                "Stay on Thread",
+                style: TextStyle(color: AppColors.accentGold, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

@@ -229,15 +229,7 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Text Reading submitted successfully!"),
-          backgroundColor: AppColors.onlineGreen,
-        ),
-      );
-
-      // Refresh readings view
-      await _loadTextReadings();
+      _showSubmissionSuccessDialog(isFastTrack: isFastTrack);
     } catch (e) {
       if (!mounted) return;
       if (e is ApiException && e.statusCode == 400) {
@@ -279,13 +271,7 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
       await _service.createServiceMessage(payload);
       if (!mounted) return;
       _queryReplyController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Query reply sent successfully!"),
-          backgroundColor: AppColors.onlineGreen,
-        ),
-      );
-      await _loadTextReadings();
+      _showReplySuccessDialog();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -294,6 +280,154 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
     } finally {
       if (mounted) setState(() => _submittingType = null);
     }
+  }
+
+  void _showSubmissionSuccessDialog({required bool isFastTrack}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgDarkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.accentGold, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.onlineGreen.withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.onlineGreen, width: 2),
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: AppColors.onlineGreen, size: 48),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              "Request Submitted!",
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Your ${isFastTrack ? 'Fast Service (within 1 hr)' : 'Regular Service (within 24 hrs)'} text reading request has been successfully sent to ${widget.advisor.name}.",
+              style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "You will be notified once your reading is ready. You can track this in Reading History.",
+              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12, height: 1.3),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  "Done & Return",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _loadTextReadings();
+              },
+              child: const Text(
+                "Stay & View Status",
+                style: TextStyle(color: AppColors.accentGold, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReplySuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgDarkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.accentGold, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.onlineGreen.withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.onlineGreen, width: 2),
+              ),
+              child: const Icon(Icons.send_rounded, color: AppColors.onlineGreen, size: 40),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              "Reply Delivered!",
+              style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Your clarification reply has been sent to ${widget.advisor.name}. The advisor will proceed with your reading.",
+              style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  "Done & Return",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _loadTextReadings();
+              },
+              child: const Text(
+                "Stay on Thread",
+                style: TextStyle(color: AppColors.accentGold, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showRechargeDialog() {
