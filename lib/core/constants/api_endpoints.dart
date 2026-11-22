@@ -97,6 +97,17 @@ class ApiEndpoints {
   static const String confirmPayment = "api/payment/confirm";
   static const String validateCoupon = "api/coupon/validate";
 
+  // Text Reading Endpoints (Exact matching web_angular_2025 & .NET 8 backend)
+  static const String textReadingRequest = "api/User/TextReadingRequest";
+  static String uploadTextReadingFile(int id) => "api/User/text-reading/$id/upload";
+  static const String customerTextReadings = "api/User/GetCustomerTextReadings";
+  static const String getServiceMessages = "api/User/GetServiceMessages";
+  static const String requestAdditionalMessage = "api/User/RequestAdditioanlMessage";
+  static const String submitTextReading = "api/User/SubmitTextReading";
+  static const String advisorTextReadings = "api/Advisor/GetAdvisorTextReadings";
+  static const String pendingAdvisorTextReadings = "api/Advisor/GetPendingAdvisorTextReadings";
+  static const String getTextReadingById = "api/Advisor/GetTextReadingById";
+
   /// Resolves image URLs for advisor photos, static banners, and uploads matching Angular web app
   static String resolveImageUrl(String? path) {
     if (path == null || path.trim().isEmpty) return '';

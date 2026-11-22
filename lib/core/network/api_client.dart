@@ -95,6 +95,43 @@ class ApiClient {
     }
   }
 
+  static Future<dynamic> uploadMultipart(
+    String endpoint, {
+    required List<int> fileBytes,
+    required String fileName,
+    String fileField = 'file',
+    Map<String, String>? fields,
+    bool requiresAuth = true,
+  }) async {
+    try {
+      final uri = _buildUri(endpoint);
+      final request = http.MultipartRequest('POST', uri);
+      if (requiresAuth) {
+        final token = await StorageService.getToken();
+        if (token == null || token.isEmpty) {
+          onUnauthorized?.call();
+          throw ApiUnauthorizedException("Authentication required or session has expired.");
+        }
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      request.files.add(http.MultipartFile.fromBytes(
+        fileField,
+        fileBytes,
+        filename: fileName,
+      ));
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      return await _processResponse(response);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException("Upload error: ${e.toString()}");
+    }
+  }
+
   static Future<dynamic> _processResponse(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;

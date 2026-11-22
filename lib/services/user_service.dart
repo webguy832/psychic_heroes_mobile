@@ -159,13 +159,48 @@ class UserService {
 
     // Customer flow
     try {
-      final response = await ApiClient.get(ApiEndpoints.readingHistory);
-      if (response is List) {
-        return response.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
-      } else if (response is Map<String, dynamic> && response['data'] is List) {
-        return (response['data'] as List).map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)).toList();
-      }
-      return [];
+      final List<ReadingHistoryItem> results = [];
+      try {
+        final response = await ApiClient.get(ApiEndpoints.readingHistory);
+        if (response is List) {
+          results.addAll(response.map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)));
+        } else if (response is Map<String, dynamic> && response['data'] is List) {
+          results.addAll((response['data'] as List).map((item) => ReadingHistoryItem.fromJson(item as Map<String, dynamic>)));
+        }
+      } catch (_) {}
+
+      // Also merge completed customer text readings
+      try {
+        final textReadingsResp = await ApiClient.get(ApiEndpoints.customerTextReadings);
+        final list = (textReadingsResp is List)
+            ? textReadingsResp
+            : (textReadingsResp is Map && textReadingsResp['data'] is List ? textReadingsResp['data'] : null);
+        if (list != null) {
+          for (final item in list) {
+            final isCompleted = item['isCompleted'] == true || item['completedOn'] != null;
+            if (isCompleted) {
+              final idStr = (item['id'] ?? item['requestId'] ?? '').toString();
+              // Prevent duplicate entry if backend history already included it
+              if (!results.any((r) => r.id == idStr)) {
+                results.add(ReadingHistoryItem(
+                  id: idStr,
+                  title: 'Text Reading - ${item['customerName'] ?? 'POI'}',
+                  advisorName: item['advisorName'] ?? item['advisorDisplayName'] ?? 'Advisor',
+                  type: 'Text Reading',
+                  typeKey: 'text',
+                  duration: item['readingType'] == true ? 'Fast Track (1 hr)' : 'Regular (24 hrs)',
+                  date: item['completedOn'] != null ? item['completedOn'].toString().split('T').first : 'Completed',
+                  cost: (item['price'] is num ? item['price'] : 9.99).toDouble(),
+                  summary: item['finalReadingText'] ?? item['specQuestion'] ?? item['generalDescription'] ?? 'Completed Text Reading',
+                  profilePhoto: item['advisorImage'] ?? item['photoUrl'],
+                ));
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      return results;
     } catch (_) {
       // If customer history 403s (e.g. user is logged in as advisor), fallback to advisor history
       try {

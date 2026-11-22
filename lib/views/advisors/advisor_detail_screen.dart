@@ -16,6 +16,7 @@ import '../user/login_screen.dart';
 import 'live_session_screen.dart';
 import 'video_call_screen.dart';
 import 'voice_call_screen.dart';
+import 'customer_text_reading_screen.dart';
 import '../../core/services/audio_service.dart';
 
 class AdvisorDetailScreen extends StatefulWidget {
@@ -201,6 +202,17 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
 
     final adv = _advisor;
     if (adv == null) return;
+
+    // Direct routing for Text Reading (async reading, does not require advisor to be online or live session reservation)
+    if (mode.toUpperCase() == "TEXT READING") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CustomerTextReadingScreen(advisor: adv),
+        ),
+      );
+      return;
+    }
 
     final targetId = (adv.loginId != null && adv.loginId!.isNotEmpty)
         ? adv.loginId!

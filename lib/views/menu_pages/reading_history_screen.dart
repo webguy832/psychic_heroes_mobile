@@ -107,6 +107,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                           _buildFilterChip("voice", "Voice Calls"),
                           const SizedBox(width: 8),
                           _buildFilterChip("video", "Video Calls"),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("text", "Text Readings"),
                         ],
                       ),
                     ),

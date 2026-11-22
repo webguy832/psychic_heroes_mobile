@@ -6,6 +6,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../main_navigation_screen.dart';
 import '../advisors/advisor_dashboard_screen.dart';
+import '../advisors/advisor_text_readings_screen.dart';
 import '../user/login_screen.dart';
 import '../user/profile_screen.dart';
 import '../user/billing_address_screen.dart';
@@ -442,6 +443,15 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         onTap: () {
           nav.setTab(0);
           Navigator.pop(context);
+        },
+      ),
+      _buildDrawerTile(
+        icon: Icons.mail_rounded,
+        title: "Text Reading Requests",
+        badgeText: "NEW",
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdvisorTextReadingsScreen()));
         },
       ),
       _buildDrawerTile(
