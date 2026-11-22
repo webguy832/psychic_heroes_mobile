@@ -22,6 +22,13 @@ class PremiumService {
         return response
             .map((item) => PremiumCategoryModel.fromJson(item as Map<String, dynamic>))
             .toList();
+      } else if (response is Map<String, dynamic>) {
+        final list = response['value'] ?? response['data'] ?? response['items'];
+        if (list is List) {
+          return list
+              .map((item) => PremiumCategoryModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
       }
       return [];
     } catch (e) {
@@ -57,6 +64,13 @@ class PremiumService {
         return response
             .map((item) => PremiumServiceModel.fromJson(item as Map<String, dynamic>))
             .toList();
+      } else if (response is Map<String, dynamic>) {
+        final list = response['value'] ?? response['data'] ?? response['items'];
+        if (list is List) {
+          return list
+              .map((item) => PremiumServiceModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
       }
       return [];
     } catch (e) {
@@ -73,7 +87,12 @@ class PremiumService {
         queryParams: {'serviceId': serviceId.toString()},
       );
       if (response is Map<String, dynamic>) {
-        return response;
+        final data = response['value'] is Map<String, dynamic>
+            ? response['value'] as Map<String, dynamic>
+            : (response['data'] is Map<String, dynamic>
+                ? response['data'] as Map<String, dynamic>
+                : response);
+        return data;
       }
       return null;
     } catch (e) {
@@ -91,7 +110,12 @@ class PremiumService {
       );
 
       if (response is Map<String, dynamic>) {
-        return StartPremiumEligibilityModel.fromJson(response);
+        final data = response['value'] is Map<String, dynamic>
+            ? response['value'] as Map<String, dynamic>
+            : (response['data'] is Map<String, dynamic>
+                ? response['data'] as Map<String, dynamic>
+                : response);
+        return StartPremiumEligibilityModel.fromJson(data);
       }
       return null;
     } catch (e) {
@@ -174,7 +198,12 @@ class PremiumService {
       );
 
       if (response is Map<String, dynamic>) {
-        return PremiumRequestModel.fromJson(response);
+        final data = response['value'] is Map<String, dynamic>
+            ? response['value'] as Map<String, dynamic>
+            : (response['data'] is Map<String, dynamic>
+                ? response['data'] as Map<String, dynamic>
+                : response);
+        return PremiumRequestModel.fromJson(data);
       }
       return null;
     } catch (e) {

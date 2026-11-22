@@ -20,6 +20,7 @@ import 'customer_text_reading_screen.dart';
 import '../../models/premium_service_model.dart';
 import '../../services/premium_service.dart';
 import 'customer_premium_order_screen.dart';
+import 'premium_services_browse_screen.dart';
 import '../../core/services/audio_service.dart';
 
 class AdvisorDetailScreen extends StatefulWidget {
@@ -94,8 +95,26 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
   Future<void> _loadLuxeServices(String advisorId) async {
     setState(() => _luxeLoading = true);
     try {
-      final advLoginId = _advisor?.loginId ?? advisorId;
-      final services = await PremiumService().getLuxeServices(advisorId: advLoginId, activeOnly: true);
+      final advName = (_advisor?.name ?? widget.advisor?.name ?? '').toLowerCase().trim();
+      final advLoginId = _advisor?.loginId ?? widget.advisor?.loginId;
+
+      List<PremiumServiceModel> services = [];
+      if (advLoginId != null && advLoginId.isNotEmpty) {
+        services = await PremiumService().getLuxeServices(advisorId: advLoginId, activeOnly: true);
+      }
+
+      if (services.isEmpty) {
+        // Fetch all active luxe services and match by advisor name or ID
+        final allLuxe = await PremiumService().getLuxeServices(activeOnly: true);
+        services = allLuxe.where((s) {
+          final sName = (s.advisorDisplayName ?? '').toLowerCase().trim();
+          final sLoginId = s.advisorLoginId.toLowerCase().trim();
+          return (advName.isNotEmpty && (sName == advName || sName.contains(advName) || advName.contains(sName))) ||
+              (advLoginId != null && advLoginId.isNotEmpty && sLoginId == advLoginId.toLowerCase().trim()) ||
+              (sLoginId == advisorId.toLowerCase().trim());
+        }).toList();
+      }
+
       if (mounted) {
         setState(() {
           _luxeServices = services;
@@ -122,6 +141,10 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
           _isLoadingAdvisor = false;
           _advisorError = null;
         });
+        // Re-check luxe services with the fresh loginId
+        if (updatedAdvisor.loginId != null && updatedAdvisor.loginId!.isNotEmpty) {
+          _loadLuxeServices(updatedAdvisor.loginId!);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -236,6 +259,34 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
           builder: (_) => CustomerTextReadingScreen(advisor: adv),
         ),
       );
+      return;
+    }
+
+    // Direct routing for Premium / Luxe Service (async ritual, does not require advisor to be online)
+    if (mode.toUpperCase() == "PREMIUM SERVICE" || mode.toUpperCase() == "LUXE SERVICE") {
+      if (_luxeServices.length == 1) {
+        final service = _luxeServices.first;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CustomerPremiumOrderScreen(
+              serviceId: service.id,
+              initialService: service,
+              advisorName: adv.name,
+              advisorPhoto: adv.profilePhoto,
+            ),
+          ),
+        );
+      } else if (_luxeServices.length > 1) {
+        _showLuxeServicesPickerSheet(adv);
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const PremiumServicesBrowseScreen(showBackButton: true),
+          ),
+        );
+      }
       return;
     }
 
@@ -384,6 +435,129 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showLuxeServicesPickerSheet(AdvisorDto adv) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1035),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.diamond_rounded, color: AppColors.accentGold, size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Luxe Services by ${adv.name}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Select a premium ritual to order directly:",
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _luxeServices.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, index) {
+                      final service = _luxeServices[index];
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.accentGold.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    service.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    "${service.duration} ${service.duration == 1 ? 'day' : 'days'} delivery • \$${service.price.toStringAsFixed(2)}",
+                                    style: const TextStyle(color: AppColors.accentGold, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.accentGold,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CustomerPremiumOrderScreen(
+                                      serviceId: service.id,
+                                      initialService: service,
+                                      advisorName: adv.name,
+                                      advisorPhoto: adv.profilePhoto,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text("Order Now", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1101,62 +1275,82 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                     const Divider(color: AppColors.borderLight),
                     const SizedBox(height: 12),
 
-                    // Action Buttons Grid (Filtered by commStyles matching Angular)
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        // CALL BUTTON (Always displayed)
-                        SizedBox(
-                          width: (MediaQuery.of(context).size.width - 74) / 2,
-                          height: 44,
-                          child: _buildActionButton(
-                            label: "CALL",
-                            icon: Icons.phone_in_talk_rounded,
-                            isPrimary: true,
-                            onTap: () => _handleAction("CALL"),
-                          ),
-                        ),
-
-                        // CHAT BUTTON (hasCommStyle(1))
-                        if (a.hasCommStyle(1))
-                          SizedBox(
-                            width: (MediaQuery.of(context).size.width - 74) / 2,
-                            height: 44,
-                            child: _buildActionButton(
-                              label: "CHAT",
-                              icon: Icons.chat_bubble_rounded,
-                              isPrimary: false,
-                              onTap: () => _handleAction("CHAT"),
+                    // Action Buttons Grid (Filtered by commStyles matching Angular + PREMIUM SERVICE)
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double btnWidth = constraints.maxWidth > 520
+                            ? (constraints.maxWidth - 20) / 3
+                            : (constraints.maxWidth - 10) / 2;
+                        return Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            // CALL BUTTON (Always displayed)
+                            SizedBox(
+                              width: btnWidth,
+                              height: 44,
+                              child: _buildActionButton(
+                                label: "CALL",
+                                icon: Icons.phone_in_talk_rounded,
+                                isPrimary: true,
+                                onTap: () => _handleAction("CALL"),
+                              ),
                             ),
-                          ),
 
-                        // VIDEO CALL BUTTON (hasCommStyle(2))
-                        if (a.hasCommStyle(2))
-                          SizedBox(
-                            width: (MediaQuery.of(context).size.width - 74) / 2,
-                            height: 44,
-                            child: _buildActionButton(
-                              label: "VIDEO CALL",
-                              icon: Icons.videocam_rounded,
-                              isPrimary: false,
-                              onTap: () => _handleAction("VIDEO CALL"),
-                            ),
-                          ),
+                            // CHAT BUTTON (hasCommStyle(1))
+                            if (a.hasCommStyle(1))
+                              SizedBox(
+                                width: btnWidth,
+                                height: 44,
+                                child: _buildActionButton(
+                                  label: "CHAT",
+                                  icon: Icons.chat_bubble_rounded,
+                                  isPrimary: false,
+                                  onTap: () => _handleAction("CHAT"),
+                                ),
+                              ),
 
-                        // TEXT READING BUTTON (hasCommStyle(4))
-                        if (a.hasCommStyle(4))
-                          SizedBox(
-                            width: (MediaQuery.of(context).size.width - 74) / 2,
-                            height: 44,
-                            child: _buildActionButton(
-                              label: "TEXT READING",
-                              icon: Icons.mail_rounded,
-                              isPrimary: false,
-                              onTap: () => _handleAction("TEXT READING"),
+                            // VIDEO CALL BUTTON (hasCommStyle(2))
+                            if (a.hasCommStyle(2))
+                              SizedBox(
+                                width: btnWidth,
+                                height: 44,
+                                child: _buildActionButton(
+                                  label: "VIDEO CALL",
+                                  icon: Icons.videocam_rounded,
+                                  isPrimary: false,
+                                  onTap: () => _handleAction("VIDEO CALL"),
+                                ),
+                              ),
+
+                            // TEXT READING BUTTON (hasCommStyle(4))
+                            if (a.hasCommStyle(4))
+                              SizedBox(
+                                width: btnWidth,
+                                height: 44,
+                                child: _buildActionButton(
+                                  label: "TEXT READING",
+                                  icon: Icons.mail_rounded,
+                                  isPrimary: false,
+                                  onTap: () => _handleAction("TEXT READING"),
+                                ),
+                              ),
+
+                            // PREMIUM SERVICE BUTTON (Prominent luxury gold button)
+                            SizedBox(
+                              width: btnWidth,
+                              height: 44,
+                              child: _buildActionButton(
+                                label: "PREMIUM SERVICE",
+                                icon: Icons.diamond_rounded,
+                                isPrimary: false,
+                                isLuxe: true,
+                                onTap: () => _handleAction("PREMIUM SERVICE"),
+                              ),
                             ),
-                          ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -1281,6 +1475,76 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                           ),
                         );
                       }).toList(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                // When advisor does not have specific rituals configured, show luxury banner linking to catalog
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2E1A47), Color(0xFF1E1035)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.accentGold.withOpacity(0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.diamond_rounded, color: AppColors.accentGold, size: 20),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              "Platinum Luxe Services",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentGold,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text("EXCLUSIVE", style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Explore bespoke spiritual rituals and verified platinum offerings across certified psychics.",
+                        style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentGold,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PremiumServicesBrowseScreen(showBackButton: true),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.explore_rounded, color: Colors.black, size: 18),
+                          label: const Text(
+                            "Explore All Luxe Services",
+                            style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1476,8 +1740,44 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
     required String label,
     required IconData icon,
     required bool isPrimary,
+    bool isLuxe = false,
     required VoidCallback onTap,
   }) {
+    if (isLuxe) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2E1A47), Color(0xFF1E1035)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accentGold, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accentGold.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: EdgeInsets.zero,
+          ),
+          onPressed: onTap,
+          icon: Icon(icon, size: 16, color: AppColors.accentGold),
+          label: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: AppColors.accentGold),
+          ),
+        ),
+      );
+    }
+
     if (isPrimary) {
       return Container(
         decoration: BoxDecoration(
