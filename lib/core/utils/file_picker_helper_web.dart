@@ -1,6 +1,7 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'dart:async';
+import 'dart:typed_data';
 import 'file_picker_helper_stub.dart';
 
 class FilePickerPlatform {
@@ -23,13 +24,22 @@ class FilePickerPlatform {
       reader.readAsArrayBuffer(file);
       reader.onLoadEnd.listen((_) {
         final result = reader.result;
-        if (result != null) {
-          final bytes = (result as dynamic) is List<int>
-              ? List<int>.from(result as dynamic)
-              : (result as html.ByteBuffer).asUint8List();
+        if (result is Uint8List) {
           completer.complete(PickedFileData(
             name: file.name,
-            bytes: bytes,
+            bytes: result,
+            size: file.size,
+          ));
+        } else if (result is ByteBuffer) {
+          completer.complete(PickedFileData(
+            name: file.name,
+            bytes: result.asUint8List(),
+            size: file.size,
+          ));
+        } else if (result is List<int>) {
+          completer.complete(PickedFileData(
+            name: file.name,
+            bytes: result,
             size: file.size,
           ));
         } else {
