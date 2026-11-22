@@ -22,6 +22,7 @@ import '../menu_pages/settings_screen.dart';
 import '../menu_pages/help_support_screen.dart';
 import '../menu_pages/customer_premium_requests_screen.dart';
 import '../advisors/advisor_premium_requests_screen.dart';
+import '../advisors/premium_services_browse_screen.dart';
 import '../shared/app_logo.dart';
 
 class AppDrawerMenu extends StatefulWidget {
@@ -349,7 +350,16 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         },
       ),
       _buildDrawerTile(
-        icon: Icons.diamond_rounded,
+        icon: Icons.diamond_outlined,
+        title: "Platinum Luxe Services",
+        badgeText: "EXCLUSIVE",
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumServicesBrowseScreen(showBackButton: true)));
+        },
+      ),
+      _buildDrawerTile(
+        icon: Icons.receipt_long_rounded,
         title: "My Premium Orders",
         badgeText: "LUXE",
         onTap: () {

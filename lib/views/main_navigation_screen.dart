@@ -12,6 +12,8 @@ import 'menu_pages/advisor_messages_screen.dart';
 import 'menu_pages/reading_history_screen.dart';
 import 'menu_pages/my_services_screen.dart';
 import 'menu_pages/wallet_screen.dart';
+import 'advisors/premium_services_browse_screen.dart';
+import 'advisors/advisor_premium_requests_screen.dart';
 import 'shared/app_logo.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -85,36 +87,43 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ? (isAdvisor
             ? const [
                 AdvisorDashboardScreen(),
+                AdvisorPremiumRequestsScreen(),
                 ProfileScreen(),
               ]
             : const [
                 HomeScreen(),
+                PremiumServicesBrowseScreen(),
                 ProfileScreen(),
               ])
         : (isAdvisor
             ? const [
                 AdvisorDashboardScreen(),
-                MyServicesScreen(),
+                AdvisorPremiumRequestsScreen(),
                 AdvisorMessagesScreen(),
                 ReadingHistoryScreen(),
                 ProfileScreen(),
               ]
             : const [
                 HomeScreen(),
-                MyServicesScreen(),
+                PremiumServicesBrowseScreen(),
                 AdvisorMessagesScreen(),
                 ReadingHistoryScreen(),
                 ProfileScreen(),
               ]);
 
     final List<BottomNavigationBarItem> navItems = !isDev
-        ? const [
-            BottomNavigationBarItem(
+        ? [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home_rounded),
               label: "Home",
             ),
             BottomNavigationBarItem(
+              icon: const Icon(Icons.diamond_outlined),
+              activeIcon: const Icon(Icons.diamond_rounded),
+              label: isAdvisor ? "Requests" : "Services",
+            ),
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline_rounded),
               activeIcon: Icon(Icons.person_rounded),
               label: "Profile",

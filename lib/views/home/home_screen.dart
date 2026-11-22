@@ -17,6 +17,7 @@ import 'widgets/home_why_choose_widget.dart';
 import 'widgets/home_how_it_works_widget.dart';
 import 'widgets/home_testimonials_widget.dart';
 import 'widgets/home_faq_widget.dart';
+import '../advisors/premium_services_browse_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -664,6 +665,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       // 6. In-Feed Engagement Card 2: Find Your Favorite Advisor / Palmistry Match
                       _buildMatchingCard(home),
 
+                      const SizedBox(height: 16),
+
+                      // In-Feed Engagement Card: Platinum Luxe Services
+                      _buildLuxeBanner(context),
+
                       const SizedBox(height: 24),
 
                       // 7. Section 2: Top Accuracy Advisors (◎ Top Accuracy)
@@ -1019,6 +1025,110 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const Text(
                     "Get Matched",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2B0844)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  Widget _buildLuxeBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2E1A47), Color(0xFF1E1035)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accentGold.withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.accentGold.withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.accentGold.withOpacity(0.4)),
+            ),
+            child: const Icon(
+              Icons.diamond_rounded,
+              color: AppColors.accentGold,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      "Platinum Luxe Services",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentGold,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text("LUXE", style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  "Order exclusive custom rituals, spells & deep clairvoyance readings.",
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textSecondaryDark,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PremiumServicesBrowseScreen(showBackButton: true),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accentGold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.auto_awesome, size: 13, color: Colors.black),
+                  label: const Text(
+                    "Explore Services",
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                 ),
               ],
