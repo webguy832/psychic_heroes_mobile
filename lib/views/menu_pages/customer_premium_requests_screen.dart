@@ -603,7 +603,12 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
                         itemCount: _messages.length,
                         itemBuilder: (context, idx) {
                           final msg = _messages[idx];
-                          final isMe = !msg.isAdvisor;
+                          final isMe = !(msg.isAdvisor == true);
+                          final senderName = isMe
+                              ? "You"
+                              : ((msg.userName != null && msg.userName!.isNotEmpty)
+                                  ? msg.userName!
+                                  : widget.request.advisorDisplayName);
 
                           return Align(
                             alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -623,7 +628,7 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        isMe ? "You" : (msg.userName.isNotEmpty ? msg.userName : widget.request.advisorDisplayName),
+                                        senderName,
                                         style: TextStyle(
                                           color: isMe ? Colors.white : AppColors.accentGold,
                                           fontSize: 11,

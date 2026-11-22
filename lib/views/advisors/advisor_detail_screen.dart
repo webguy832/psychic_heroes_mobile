@@ -1268,7 +1268,7 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
                                             serviceId: service.id,
                                             initialService: service,
                                             advisorName: a.name,
-                                            advisorPhoto: a.profileImage,
+                                            advisorPhoto: a.profilePhoto,
                                           ),
                                         ),
                                       );

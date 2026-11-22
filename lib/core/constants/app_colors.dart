@@ -16,6 +16,7 @@ class AppColors {
   
   // Backgrounds (Matching Web App Light & Deep Purple Layouts)
   static const Color bgDark = Color(0xFF2B0844);          // Deep Purple Body / Header Background
+  static const Color bgDarkHeader = Color(0xFF1F0433);    // Header / AppBar Background Dark
   static const Color bgDarkCard = Color(0xFF1F0433);      // Card Background Dark
   static const Color bgDarkCardElevated = Color(0xFF3B0D5D); // Elevated Card Dark
   static const Color bgLight = Color(0xFFF9F7FF);         // Web Soft Lavender Light Background

@@ -449,7 +449,8 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
               itemCount: _messages.length,
               itemBuilder: (context, idx) {
                 final msg = _messages[idx];
-                final isAdvisor = msg.isAdvisor;
+                final isAdvisor = msg.isAdvisor == true;
+                final senderName = isAdvisor ? "You (Advisor)" : (msg.userName ?? "Customer");
 
                 return Align(
                   alignment: isAdvisor ? Alignment.centerRight : Alignment.centerLeft,
@@ -469,7 +470,7 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              isAdvisor ? "You (Advisor)" : msg.userName,
+                              senderName,
                               style: TextStyle(
                                 color: isAdvisor ? Colors.white : AppColors.accentGold,
                                 fontSize: 10,

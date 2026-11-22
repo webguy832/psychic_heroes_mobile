@@ -6,6 +6,7 @@ class AdvisorDto {
   final String? advisorId;
   final String name;
   final String? profilePhoto;
+  String? get profileImage => profilePhoto;
   final String status; // Online, Busy, Offline
   final double rating;
   final int reviewsCount;
