@@ -1033,6 +1033,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
   Widget _buildLuxeBanner(BuildContext context) {
     return Container(
       width: double.infinity,
