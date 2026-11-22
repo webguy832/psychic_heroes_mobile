@@ -9,6 +9,7 @@ import 'live_session_screen.dart';
 import 'video_call_screen.dart';
 import 'voice_call_screen.dart';
 import 'advisor_text_readings_screen.dart';
+import 'advisor_premium_requests_screen.dart';
 import '../../core/services/audio_service.dart';
 
 class AdvisorDashboardScreen extends StatefulWidget {
@@ -497,6 +498,24 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AdvisorTextReadingsScreen()),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        ListTile(
+          tileColor: AppColors.bgDarkCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          leading: const Icon(Icons.diamond_rounded, color: AppColors.accentGold),
+          title: const Text("Premium / Luxe Requests", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          subtitle: const Text("Accept and manage high-value platinum customer service orders", style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 11)),
+          trailing: ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)), // Green-800
+            child: const Text("View Orders", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdvisorPremiumRequestsScreen()),
               );
             },
           ),

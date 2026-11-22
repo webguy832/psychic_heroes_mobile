@@ -108,6 +108,20 @@ class ApiEndpoints {
   static const String pendingAdvisorTextReadings = "api/Advisor/GetPendingAdvisorTextReadings";
   static const String getTextReadingById = "api/Advisor/GetTextReadingById";
 
+  // Platinum / Premium Service Endpoints (Exact matching web_angular_2025 & .NET 8 backend)
+  static const String premiumCategory = "api/PlatinumService/GetPremiumCategory";
+  static const String premiumLuxeCategories = "api/PlatinumService/luxe-categories";
+  static const String premiumDetails = "api/PlatinumService/details";
+  static const String loadPremium = "api/PlatinumService/loadpremium";
+  static const String startPremium = "api/PlatinumService/StartPremium";
+  static const String premiumRequests = "api/PlatinumService/GetPremiumRequests";
+  static const String premiumRequestDetail = "api/PlatinumService/premium-request-detail";
+  static const String acceptPremiumRequest = "api/PlatinumService/accept";
+  static const String markCompletedPremiumRequest = "api/PlatinumService/mark-completed";
+  static const String cancelPremiumRequest = "api/PlatinumService/cancel";
+  static const String myPremiumServices = "api/PlatinumService/GetMyServices";
+  static const String discountPercentage = "api/PlatinumService/GetDiscountPercentage";
+
   /// Resolves image URLs for advisor photos, static banners, and uploads matching Angular web app
   static String resolveImageUrl(String? path) {
     if (path == null || path.trim().isEmpty) return '';

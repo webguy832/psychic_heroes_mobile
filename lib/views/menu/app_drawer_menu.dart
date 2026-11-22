@@ -20,6 +20,8 @@ import '../menu_pages/insights_screen.dart';
 import '../menu_pages/my_services_screen.dart';
 import '../menu_pages/settings_screen.dart';
 import '../menu_pages/help_support_screen.dart';
+import '../menu_pages/customer_premium_requests_screen.dart';
+import '../advisors/advisor_premium_requests_screen.dart';
 import '../shared/app_logo.dart';
 
 class AppDrawerMenu extends StatefulWidget {
@@ -347,6 +349,15 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         },
       ),
       _buildDrawerTile(
+        icon: Icons.diamond_rounded,
+        title: "My Premium Orders",
+        badgeText: "LUXE",
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPremiumRequestsScreen()));
+        },
+      ),
+      _buildDrawerTile(
         icon: Icons.card_giftcard_rounded,
         title: "Referrals & Rewards",
         badgeText: "BONUS",
@@ -452,6 +463,15 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         onTap: () {
           Navigator.pop(context);
           Navigator.push(context, MaterialPageRoute(builder: (_) => const AdvisorTextReadingsScreen()));
+        },
+      ),
+      _buildDrawerTile(
+        icon: Icons.diamond_rounded,
+        title: "Premium Requests",
+        badgeText: "ORDERS",
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdvisorPremiumRequestsScreen()));
         },
       ),
       _buildDrawerTile(

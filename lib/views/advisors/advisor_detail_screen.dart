@@ -17,6 +17,9 @@ import 'live_session_screen.dart';
 import 'video_call_screen.dart';
 import 'voice_call_screen.dart';
 import 'customer_text_reading_screen.dart';
+import '../../models/premium_service_model.dart';
+import '../../services/premium_service.dart';
+import 'customer_premium_order_screen.dart';
 import '../../core/services/audio_service.dart';
 
 class AdvisorDetailScreen extends StatefulWidget {
@@ -46,6 +49,9 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
   bool _reviewsLoading = true;
   int _totalReviewsCount = 0;
   double _avgRating = 0.0;
+
+  List<PremiumServiceModel> _luxeServices = [];
+  bool _luxeLoading = false;
 
   bool _isFavorite = false;
 
@@ -80,6 +86,25 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
 
     // 3. Fetch reviews from API
     _loadAdvisorReviews(advisorId);
+
+    // 4. Fetch Luxe/Premium Services from API
+    _loadLuxeServices(advisorId);
+  }
+
+  Future<void> _loadLuxeServices(String advisorId) async {
+    setState(() => _luxeLoading = true);
+    try {
+      final advLoginId = _advisor?.loginId ?? advisorId;
+      final services = await PremiumService().getLuxeServices(advisorId: advLoginId, activeOnly: true);
+      if (mounted) {
+        setState(() {
+          _luxeServices = services;
+          _luxeLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _luxeLoading = false);
+    }
   }
 
   Future<void> _loadAdvisorProfile(String advisorId, String? userId) async {
@@ -1138,6 +1163,129 @@ class _AdvisorDetailScreenState extends State<AdvisorDetailScreen> {
               ),
 
               const SizedBox(height: 16),
+
+              // PLATINUM LUXE SERVICES SECTION (Dynamic from api/PlatinumService/luxe-categories)
+              if (_luxeServices.isNotEmpty) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2E1A47), Color(0xFF1E1035)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.accentGold.withOpacity(0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.diamond_rounded, color: AppColors.accentGold, size: 20),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              "Platinum Luxe Services",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentGold,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text("EXCLUSIVE", style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "Custom spiritual rituals and services tailored for you by ${a.name}.",
+                        style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._luxeServices.map((service) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      service.title,
+                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "\$${service.price.toStringAsFixed(2)}",
+                                    style: const TextStyle(color: AppColors.accentGold, fontSize: 15, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              if (service.serviceDescription != null && service.serviceDescription!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  service.serviceDescription!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, height: 1.3),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.timer_outlined, color: AppColors.textSecondaryDark, size: 13),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "${service.duration} ${service.duration == 1 ? 'day' : 'days'} delivery",
+                                    style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
+                                  ),
+                                  const Spacer(),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.accentGold,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => CustomerPremiumOrderScreen(
+                                            serviceId: service.id,
+                                            initialService: service,
+                                            advisorName: a.name,
+                                            advisorPhoto: a.profileImage,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text("Order Now", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // ABOUT SECTION (From API: a.aboutMyServices or a.bio)
               Container(
