@@ -2,7 +2,7 @@
 import 'dart:html' as html;
 import 'dart:async';
 import 'dart:typed_data';
-import 'file_picker_helper_stub.dart';
+import 'file_picker_helper.dart';
 
 class FilePickerPlatform {
   static Future<PickedFileData?> pickFile({List<String>? allowedExtensions}) async {

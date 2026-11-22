@@ -1,14 +1,4 @@
-class PickedFileData {
-  final String name;
-  final List<int> bytes;
-  final int size;
-
-  PickedFileData({
-    required this.name,
-    required this.bytes,
-    required this.size,
-  });
-}
+import 'file_picker_helper.dart';
 
 class FilePickerPlatform {
   static Future<PickedFileData?> pickFile({List<String>? allowedExtensions}) async {
