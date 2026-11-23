@@ -11,10 +11,13 @@ class TextReadingService {
         return response
             .map((item) => TextReadingModel.fromJson(item as Map<String, dynamic>))
             .toList();
-      } else if (response is Map<String, dynamic> && response.containsKey('data') && response['data'] is List) {
-        return (response['data'] as List)
-            .map((item) => TextReadingModel.fromJson(item as Map<String, dynamic>))
-            .toList();
+      } else if (response is Map<String, dynamic>) {
+        final list = response['data'] ?? response['value'] ?? response['items'];
+        if (list is List) {
+          return list
+              .map((item) => TextReadingModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
       }
       return [];
     } catch (e) {
@@ -53,10 +56,13 @@ class TextReadingService {
         return response
             .map((item) => ServiceMessageModel.fromJson(item as Map<String, dynamic>))
             .toList();
-      } else if (response is Map<String, dynamic> && response.containsKey('data') && response['data'] is List) {
-        return (response['data'] as List)
-            .map((item) => ServiceMessageModel.fromJson(item as Map<String, dynamic>))
-            .toList();
+      } else if (response is Map<String, dynamic>) {
+        final list = response['data'] ?? response['value'] ?? response['items'];
+        if (list is List) {
+          return list
+              .map((item) => ServiceMessageModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
       }
       return [];
     } catch (e) {
