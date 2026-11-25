@@ -386,7 +386,7 @@ class UserProvider extends ChangeNotifier {
     final messenger = appScaffoldMessengerKey.currentState;
     if (messenger == null) return;
 
-    final detail = notification.notificationDetail;
+    final detail = notification.message;
     final isPremium = detail.toLowerCase().contains('premium') || detail.toLowerCase().contains('luxe');
     final isTextReading = detail.toLowerCase().contains('text reading');
 
