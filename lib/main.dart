@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/constants/app_keys.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
@@ -27,6 +28,8 @@ class PsychicHeroesApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SessionProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: appNavigatorKey,
+        scaffoldMessengerKey: appScaffoldMessengerKey,
         title: 'PsychicHeroes',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,

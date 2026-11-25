@@ -1,10 +1,19 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_keys.dart';
+import '../core/services/audio_service.dart';
 import '../core/utils/storage_service.dart';
 import '../models/user_model.dart';
 import '../models/notification_model.dart';
 import '../services/user_service.dart';
 import '../services/advisor_service.dart';
 import '../services/signalr_service.dart';
+import '../views/advisors/advisor_premium_requests_screen.dart';
+import '../views/advisors/advisor_text_readings_screen.dart';
+import '../views/menu_pages/customer_premium_requests_screen.dart';
+import '../views/menu_pages/reading_history_screen.dart';
+import '../views/user/notifications_screen.dart';
 
 class UserProvider extends ChangeNotifier {
   final UserService _userService = UserService();
@@ -54,6 +63,7 @@ class UserProvider extends ChangeNotifier {
   }
 
   void clearUser() {
+    stopNotificationPolling();
     _user = null;
     _advisorProfileId = null;
     _walletSummary = null;
@@ -171,6 +181,9 @@ class UserProvider extends ChangeNotifier {
       } catch (e) {
         debugPrint("SignalR auto-connect error: $e");
       }
+
+      // Start background real-time notification polling
+      startNotificationPolling();
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -307,6 +320,171 @@ class UserProvider extends ChangeNotifier {
       _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
       notifyListeners();
     }
+  }
+
+  // --- Real-time Notification Background Polling & In-App Alerts ---
+  Timer? _notificationPollingTimer;
+  final Set<int> _knownNotificationIds = {};
+  bool _isFirstNotificationFetch = true;
+
+  void startNotificationPolling() {
+    _notificationPollingTimer?.cancel();
+    _isFirstNotificationFetch = true;
+    _knownNotificationIds.clear();
+    // Immediate initial poll
+    pollNotificationsSilently();
+    // Background polling every 5 seconds
+    _notificationPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      pollNotificationsSilently();
+    });
+  }
+
+  void stopNotificationPolling() {
+    _notificationPollingTimer?.cancel();
+    _notificationPollingTimer = null;
+    _knownNotificationIds.clear();
+  }
+
+  Future<void> pollNotificationsSilently() async {
+    if (_user == null) return;
+    try {
+      final list = await _userService.getNotifications(isAdvisor: isAdvisor);
+      if (_user == null) return;
+
+      if (_isFirstNotificationFetch) {
+        _isFirstNotificationFetch = false;
+        _knownNotificationIds.addAll(list.map((n) => n.id));
+        _notifications = list;
+        notifyListeners();
+        return;
+      }
+
+      // Detect brand new notifications that were not present in previous snapshot
+      NotificationDto? latestNewNotification;
+      for (var n in list) {
+        if (!_knownNotificationIds.contains(n.id)) {
+          _knownNotificationIds.add(n.id);
+          if (!n.isRead && latestNewNotification == null) {
+            latestNewNotification = n;
+          }
+        }
+      }
+
+      _notifications = list;
+      notifyListeners();
+
+      if (latestNewNotification != null) {
+        // Play notification chime sound
+        AudioService.playMessageChime();
+        // Show in-app banner toast with 1-tap navigation
+        _showInAppNotificationBanner(latestNewNotification);
+      }
+    } catch (_) {}
+  }
+
+  void _showInAppNotificationBanner(NotificationDto notification) {
+    final messenger = appScaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+
+    final detail = notification.notificationDetail;
+    final isPremium = detail.toLowerCase().contains('premium') || detail.toLowerCase().contains('luxe');
+    final isTextReading = detail.toLowerCase().contains('text reading');
+
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        backgroundColor: const Color(0xFF281145),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: isPremium ? AppColors.accentGold : AppColors.onlineGreen,
+            width: 1.5,
+          ),
+        ),
+        elevation: 10,
+        duration: const Duration(seconds: 5),
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (isPremium ? AppColors.accentGold : AppColors.onlineGreen).withOpacity(0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isPremium
+                    ? Icons.diamond_rounded
+                    : (isTextReading ? Icons.mail_rounded : Icons.notifications_active_rounded),
+                color: isPremium ? AppColors.accentGold : AppColors.onlineGreen,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isPremium
+                        ? "Platinum / Luxe Update"
+                        : (isTextReading ? "Text Reading Update" : "New Notification"),
+                    style: TextStyle(
+                      color: isPremium ? AppColors.accentGold : AppColors.onlineGreen,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.25),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: isPremium ? AppColors.accentGold : AppColors.onlineGreen,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                messenger.hideCurrentSnackBar();
+                final nav = appNavigatorKey.currentState;
+                if (nav == null) return;
+
+                if (isAdvisor) {
+                  if (isPremium) {
+                    nav.push(MaterialPageRoute(builder: (_) => const AdvisorPremiumRequestsScreen()));
+                  } else if (isTextReading) {
+                    nav.push(MaterialPageRoute(builder: (_) => const AdvisorTextReadingsScreen()));
+                  } else {
+                    nav.push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+                  }
+                } else {
+                  if (isPremium) {
+                    nav.push(MaterialPageRoute(builder: (_) => const CustomerPremiumRequestsScreen()));
+                  } else if (isTextReading) {
+                    nav.push(MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()));
+                  } else {
+                    nav.push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+                  }
+                }
+              },
+              child: const Text("View", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<bool> createBillingAddress(BillingAddressDto dto) async {

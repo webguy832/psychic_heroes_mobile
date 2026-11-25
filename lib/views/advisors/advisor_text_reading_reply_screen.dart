@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/audio_service.dart';
 import '../../models/text_reading_model.dart';
 import '../../providers/user_provider.dart';
 import '../../services/text_reading_service.dart';
@@ -32,18 +34,43 @@ class _AdvisorTextReadingReplyScreenState extends State<AdvisorTextReadingReplyS
 
   TextReadingModel? _textReading;
   List<ServiceMessageModel> _conversationMessages = [];
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadDetails();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _clarificationController.dispose();
     _finalReadingController.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _silentPollMessages());
+  }
+
+  Future<void> _silentPollMessages() async {
+    if (!mounted) return;
+    try {
+      final messages = await _service.getServiceMessages(widget.requestId, entityType: 2);
+      if (!mounted) return;
+      if (messages.length > _conversationMessages.length) {
+        final hasNewClient = messages.skip(_conversationMessages.length).any((m) => m.isAdvisor != true);
+        if (hasNewClient) {
+          AudioService.playMessageChime();
+        }
+        setState(() {
+          _conversationMessages = messages;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadDetails() async {

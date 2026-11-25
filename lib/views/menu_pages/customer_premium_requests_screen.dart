@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/services/audio_service.dart';
 import '../../models/premium_service_model.dart';
 import '../../models/text_reading_model.dart';
 import '../../providers/user_provider.dart';
@@ -26,11 +28,36 @@ class _CustomerPremiumRequestsScreenState extends State<CustomerPremiumRequestsS
   final int _pageSize = 10;
   int _totalCount = 0;
   int _totalPages = 1;
+  Timer? _listPollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadRequests();
+    _listPollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted) _silentPollRequests();
+    });
+  }
+
+  @override
+  void dispose() {
+    _listPollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _silentPollRequests() async {
+    try {
+      final res = await _premiumService.getPremiumRequests(pageNumber: _pageNumber, pageSize: _pageSize);
+      if (!mounted) return;
+      final newRequests = (res['data'] as List<PremiumRequestModel>?) ?? [];
+      final newCount = (res['totalCount'] as int?) ?? newRequests.length;
+      final newPages = (res['totalPages'] as int?) ?? 1;
+      setState(() {
+        _allRequests = newRequests;
+        _totalCount = newCount;
+        _totalPages = newPages;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadRequests() async {
@@ -466,18 +493,56 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
   bool _isLoading = true;
   bool _isSending = false;
   List<ServiceMessageModel> _messages = [];
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _silentPollMessages());
+  }
+
+  Future<void> _silentPollMessages() async {
+    if (!mounted) return;
+    try {
+      final res = await widget.premiumService.getServiceMessages(widget.request.id);
+      if (!mounted) return;
+      if (res.length > _messages.length) {
+        final hasNewAdvisorMsg = res.skip(_messages.length).any((m) => m.isAdvisor == true);
+        if (hasNewAdvisorMsg) {
+          AudioService.playMessageChime();
+        }
+        setState(() {
+          _messages = res;
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {}
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -485,6 +550,7 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
     try {
       final res = await widget.premiumService.getServiceMessages(widget.request.id);
       _messages = res;
+      _scrollToBottom();
     } catch (e) {
       debugPrint("Error loading service messages: $e");
     } finally {
@@ -501,7 +567,24 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
     final userName = user?.displayName ?? user?.screenName ?? "Customer";
     final userId = user?.id ?? widget.request.userId;
 
-    setState(() => _isSending = true);
+    // Optimistic UI Append - Message shows immediately with zero wait!
+    final localMsg = ServiceMessageModel(
+      id: DateTime.now().millisecondsSinceEpoch,
+      entityId: widget.request.id,
+      entityTypeId: 1,
+      messageText: text,
+      userId: userId,
+      userName: userName,
+      isAdvisor: false,
+      createDate: DateTime.now(),
+    );
+
+    setState(() {
+      _messages.add(localMsg);
+      _isSending = true;
+    });
+    _messageController.clear();
+    _scrollToBottom();
 
     final payload = {
       'requestId': widget.request.id,
@@ -515,14 +598,10 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
 
     try {
       await widget.premiumService.createServiceMessage(payload);
-      _messageController.clear();
-      await _loadMessages();
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      final res = await widget.premiumService.getServiceMessages(widget.request.id);
+      if (mounted) {
+        setState(() => _messages = res);
+        _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {

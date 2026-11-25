@@ -11,5 +11,10 @@ class AudioService {
   static void stopRingtone() {
     stopRingtonePlatform();
   }
+
+  /// Plays a short notification / incoming message chime sound
+  static void playMessageChime() {
+    playMessageChimePlatform();
+  }
 }
 

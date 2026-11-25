@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/services/audio_service.dart';
 import '../../models/premium_service_model.dart';
 import '../../models/text_reading_model.dart';
 import '../../providers/user_provider.dart';
@@ -31,18 +33,54 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
 
   PremiumRequestModel? _request;
   List<ServiceMessageModel> _messages = [];
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadDetails();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _silentPollMessages());
+  }
+
+  Future<void> _silentPollMessages() async {
+    if (!mounted) return;
+    try {
+      final msgs = await _premiumService.getServiceMessages(widget.requestId);
+      if (!mounted) return;
+      if (msgs.length > _messages.length) {
+        final hasNewClientMsg = msgs.skip(_messages.length).any((m) => m.isAdvisor != true);
+        if (hasNewClientMsg) {
+          AudioService.playMessageChime();
+        }
+        setState(() => _messages = msgs);
+        _scrollToBottom();
+      }
+    } catch (_) {}
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _loadDetails() async {
@@ -53,6 +91,7 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
 
       final msgs = await _premiumService.getServiceMessages(widget.requestId);
       _messages = msgs;
+      _scrollToBottom();
     } catch (e) {
       debugPrint("Error loading premium request detail: $e");
     } finally {
@@ -69,7 +108,24 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
     final advisorName = user?.displayName ?? user?.screenName ?? "Advisor";
     final advisorId = user?.id ?? _request!.advisorUserId;
 
-    setState(() => _isSendingMessage = true);
+    // Optimistic UI Append - Shows immediately with zero delay
+    final localMsg = ServiceMessageModel(
+      id: DateTime.now().millisecondsSinceEpoch,
+      entityId: widget.requestId,
+      entityTypeId: 1,
+      messageText: text,
+      userId: advisorId,
+      userName: advisorName,
+      isAdvisor: true,
+      createDate: DateTime.now(),
+    );
+
+    setState(() {
+      _messages.add(localMsg);
+      _isSendingMessage = true;
+    });
+    _messageController.clear();
+    _scrollToBottom();
 
     final payload = {
       'requestId': widget.requestId,
@@ -84,15 +140,10 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
 
     try {
       await _premiumService.createServiceMessage(payload);
-      _messageController.clear();
       final msgs = await _premiumService.getServiceMessages(widget.requestId);
-      setState(() => _messages = msgs);
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      if (mounted) {
+        setState(() => _messages = msgs);
+        _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {

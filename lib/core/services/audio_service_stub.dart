@@ -6,3 +6,7 @@ void stopRingtonePlatform() {
   // Native mobile stub
 }
 
+void playMessageChimePlatform() {
+  // Native mobile stub
+}
+

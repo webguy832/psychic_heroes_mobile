@@ -13,3 +13,9 @@ void stopRingtonePlatform() {
   } catch (_) {}
 }
 
+void playMessageChimePlatform() {
+  try {
+    js.context.callMethod('playMessageChime');
+  } catch (_) {}
+}
+

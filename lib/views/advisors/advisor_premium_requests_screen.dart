@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
@@ -24,11 +25,36 @@ class _AdvisorPremiumRequestsScreenState extends State<AdvisorPremiumRequestsScr
   final int _pageSize = 10;
   int _totalCount = 0;
   int _totalPages = 1;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadRequests();
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted) _silentPollRequests();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _silentPollRequests() async {
+    try {
+      final res = await _premiumService.getPremiumRequests(pageNumber: _pageNumber, pageSize: _pageSize);
+      if (!mounted) return;
+      final newRequests = (res['data'] as List<PremiumRequestModel>?) ?? [];
+      final newCount = (res['totalCount'] as int?) ?? newRequests.length;
+      final newPages = (res['totalPages'] as int?) ?? 1;
+      setState(() {
+        _allRequests = newRequests;
+        _totalCount = newCount;
+        _totalPages = newPages;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadRequests() async {

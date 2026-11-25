@@ -183,6 +183,37 @@
           } catch (e) {}
         }
       };
+
+      window.playMessageChime = function() {
+        unlockAudioContext();
+        try {
+          if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          var now = audioCtx.currentTime;
+          function playChimeTone(freq, start, duration) {
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + start);
+            gain.gain.setValueAtTime(0.001, now + start);
+            gain.gain.exponentialRampToValueAtTime(0.25, now + start + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + start);
+            osc.stop(now + start + duration);
+          }
+          // Uplifting double-tone chime (F#5, A#5)
+          playChimeTone(739.99, 0.0, 0.22);
+          playChimeTone(932.33, 0.12, 0.35);
+        } catch (e) {
+          console.warn('playMessageChime error:', e);
+        }
+      };
     })();
   </script>
 

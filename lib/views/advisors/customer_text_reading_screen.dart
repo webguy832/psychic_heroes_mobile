@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_keys.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/services/audio_service.dart';
 import '../../core/utils/file_picker_helper.dart';
 import '../../models/advisor_model.dart';
 import '../../models/text_reading_model.dart';
@@ -55,20 +58,47 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
   DateTime? _quesDate;
   DateTime? _resDate;
   List<ServiceMessageModel> _conversationMessages = [];
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadTextReadings();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _customerNameController.dispose();
     _situationController.dispose();
     _specQuestionController.dispose();
     _queryReplyController.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _silentPollReading());
+  }
+
+  Future<void> _silentPollReading() async {
+    if (!mounted || !_isExistingResponse || _readingId <= 0) return;
+    try {
+      final messages = await _service.getServiceMessages(_readingId, entityType: 2);
+      if (!mounted) return;
+      if (messages.length > _conversationMessages.length) {
+        final hasNewAdv = messages.skip(_conversationMessages.length).any((m) => m.isAdvisor == true);
+        if (hasNewAdv) {
+          AudioService.playMessageChime();
+        }
+        setState(() {
+          _conversationMessages = messages;
+          _hasAdvisorResponse = true;
+          _isAdvisorResponded = messages.isNotEmpty && (messages.last.isAdvisor == true);
+        });
+      }
+    } catch (_) {}
   }
 
   String _getAdvisorId() {
@@ -286,7 +316,22 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
     final userProv = Provider.of<UserProvider>(context, listen: false);
     final userName = userProv.user?.displayName ?? userProv.user?.screenName ?? "Customer";
 
-    setState(() => _submittingType = 'reply');
+    final localMsg = ServiceMessageModel(
+      id: DateTime.now().millisecondsSinceEpoch,
+      entityId: _readingId,
+      entityTypeId: 2,
+      messageText: queryText,
+      userId: userProv.user?.id ?? "",
+      userName: userName,
+      isAdvisor: false,
+      createDate: DateTime.now(),
+    );
+
+    setState(() {
+      _conversationMessages.add(localMsg);
+      _submittingType = 'reply';
+    });
+    _queryReplyController.clear();
 
     final payload = {
       'MessageText': queryText,
@@ -300,7 +345,6 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
     try {
       await _service.createServiceMessage(payload);
       if (!mounted) return;
-      _queryReplyController.clear();
       _showReplySuccessDialog();
     } catch (e) {
       if (!mounted) return;
