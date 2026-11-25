@@ -107,10 +107,16 @@ class SessionProvider extends ChangeNotifier {
   bool _isSpeakerOn = true;
   bool _isVideoOn = true;
 
-  // Overview stats
-  double _totalEarningsToday = 1420.50;
-  int _completedSessionsToday = 14;
-  double _advisorBaseRate = 0.49;
+  // Overview stats (populated from API)
+  double _totalEarningsToday = 0.0;
+  int _completedSessionsToday = 0;
+  double _advisorBaseRate = 0.0;
+
+  void syncAdvisorStats({required double earningsToday, required int completedSessions}) {
+    _totalEarningsToday = earningsToday;
+    _completedSessionsToday = completedSessions;
+    notifyListeners();
+  }
 
   // Current user identifiers for message attribution & role
   String _currentUserId = '';

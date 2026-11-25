@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/advisor_service.dart';
 import 'live_session_screen.dart';
 import 'video_call_screen.dart';
 import 'voice_call_screen.dart';
@@ -20,8 +23,19 @@ class AdvisorDashboardScreen extends StatefulWidget {
 }
 
 class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
+  final AdvisorService _advisorService = AdvisorService();
   bool _isDialogShowing = false;
   String? _currentShowingDialogRequestId;
+
+  bool _isLoadingStats = true;
+  Map<String, dynamic>? _advisorProfile;
+  double _earningsToday = 0.0;
+  int _totalSessions = 0;
+  int _totalReviews = 0;
+  double _rating = 0.0;
+  int _missedOrCancelled = 0;
+  int _pendingTextReadings = 0;
+  List<Map<String, dynamic>> _recentBookings = [];
 
   @override
   void initState() {
@@ -34,8 +48,78 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
         final profileId = await userProv.getOrFetchAdvisorProfileId();
         final effectiveId = (profileId != null && profileId.isNotEmpty) ? profileId : user.id;
         sessionProv.startAdvisorPolling(effectiveId, advisorName: user.displayName, userId: user.id);
+        await _loadDashboardData(advisorProfileId: profileId);
+      } else {
+        if (mounted) setState(() => _isLoadingStats = false);
       }
     });
+  }
+
+  Future<void> _loadDashboardData({String? advisorProfileId, bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() => _isLoadingStats = true);
+    }
+    try {
+      final userProv = Provider.of<UserProvider>(context, listen: false);
+      final profileId = advisorProfileId ?? await userProv.getOrFetchAdvisorProfileId();
+
+      final results = await Future.wait([
+        _advisorService.getAdvisorDashboard(advisorProfileId: profileId),
+        _advisorService.getAdvisorProfileDetails(),
+        _advisorService.getAdvisorBookingsHistory(page: 1, pageSize: 10),
+      ]);
+
+      if (!mounted) return;
+
+      final dashboard = results[0] as Map<String, dynamic>?;
+      final profile = results[1] as Map<String, dynamic>?;
+      final bookings = (results[2] as List<Map<String, dynamic>>?) ?? [];
+
+      double earningsToday = _earningsToday;
+      int totalSessions = _totalSessions;
+      int totalReviews = _totalReviews;
+      double rating = _rating;
+      int missed = _missedOrCancelled;
+      int pendingText = _pendingTextReadings;
+
+      if (dashboard != null) {
+        final quickStats = dashboard['quickStats'] as Map<String, dynamic>?;
+        if (quickStats != null) {
+          earningsToday = (quickStats['earningsToday'] as num?)?.toDouble() ?? 0.0;
+          totalSessions = (quickStats['totalSessions'] as num?)?.toInt() ?? 0;
+          totalReviews = (quickStats['totalReviews'] as num?)?.toInt() ?? 0;
+          rating = (quickStats['rating'] as num?)?.toDouble() ?? 0.0;
+        }
+        final sessionsSummary = dashboard['sessionsSummary'] as Map<String, dynamic>?;
+        if (sessionsSummary != null) {
+          pendingText = (sessionsSummary['pendingTextReadings'] as num?)?.toInt() ?? 0;
+          missed = (sessionsSummary['missedOrCancelled'] as num?)?.toInt() ?? 0;
+        }
+      }
+
+      if (mounted) {
+        final sessionProv = Provider.of<SessionProvider>(context, listen: false);
+        sessionProv.syncAdvisorStats(
+          earningsToday: earningsToday,
+          completedSessions: totalSessions,
+        );
+        setState(() {
+          _advisorProfile = profile;
+          _earningsToday = earningsToday;
+          _totalSessions = totalSessions;
+          _totalReviews = totalReviews;
+          _rating = rating;
+          _missedOrCancelled = missed;
+          _pendingTextReadings = pendingText;
+          _recentBookings = bookings;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingStats = false);
+      }
+    }
   }
 
   @override
@@ -176,63 +260,83 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Advisor Profile Header Card
-            _buildProfileHeaderCard(sessionProv, user),
+      body: RefreshIndicator(
+        color: AppColors.accentGold,
+        backgroundColor: AppColors.bgDarkCard,
+        onRefresh: () => _loadDashboardData(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Advisor Profile Header Card
+              _buildProfileHeaderCard(sessionProv, user),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Incoming Call / Chat Request Section (Notification Banner)
-            _buildIncomingRequestsSection(context, sessionProv),
+              // Incoming Call / Chat Request Section (Notification Banner)
+              _buildIncomingRequestsSection(context, sessionProv),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Overview Metrics Grid
-            const Text(
-              "Earnings & Metrics Overview",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            _buildMetricsGrid(sessionProv),
+              // Overview Metrics Grid
+              const Text(
+                "Earnings & Metrics Overview",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              _buildMetricsGrid(sessionProv),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Quick Actions Section
-            const Text(
-              "Advisor Quick Tools",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            _buildQuickToolsGrid(context, sessionProv),
+              // Quick Actions Section
+              const Text(
+                "Advisor Quick Tools",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              _buildQuickToolsGrid(context, sessionProv),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Recent Sessions History
-            const Text(
-              "Recent Client Sessions",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            _buildRecentSessionsList(),
-          ],
+              // Recent Sessions History
+              const Text(
+                "Recent Client Sessions",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              _buildRecentSessionsList(),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildProfileHeaderCard(SessionProvider sessionProv, dynamic user) {
-    final name = (user != null && user.displayName != null && user.displayName.isNotEmpty)
-        ? user.displayName
-        : (user?.screenName != null && user.screenName.isNotEmpty ? user.screenName : "Advisor");
+    final profileName = _advisorProfile?['displayName']?.toString();
+    final name = (profileName != null && profileName.isNotEmpty)
+        ? profileName
+        : ((user != null && user.displayName != null && user.displayName.isNotEmpty)
+            ? user.displayName
+            : (user?.screenName != null && user.screenName.isNotEmpty ? user.screenName : (user?.email ?? "Advisor")));
     final initial = (name != null && name.isNotEmpty) ? name[0].toUpperCase() : 'A';
-    final photo = user?.profilePhoto;
-    final bio = (user?.userDescription != null && user.userDescription.isNotEmpty)
-        ? user.userDescription
-        : "Spiritual Psychic Advisor & Intuitive Guide";
+    final rawPhoto = (_advisorProfile?['profileImage']?.toString().isNotEmpty == true)
+        ? _advisorProfile!['profileImage'].toString()
+        : user?.profilePhoto?.toString();
+    final photoUrl = (rawPhoto != null && rawPhoto.isNotEmpty) ? ApiEndpoints.resolveImageUrl(rawPhoto) : '';
+    final profileBio = (_advisorProfile?['briefDescription']?.toString().isNotEmpty == true)
+        ? _advisorProfile!['briefDescription'].toString()
+        : (_advisorProfile?['aboutMyServices']?.toString().isNotEmpty == true)
+            ? _advisorProfile!['aboutMyServices'].toString()
+            : (user?.userDescription != null && user.userDescription.isNotEmpty)
+                ? user.userDescription.toString()
+                : "";
+    final isVerified = _advisorProfile?['emailVerified'] == true ||
+        _advisorProfile?['profileStatus']?.toString().toLowerCase() == 'approved';
+    final ratingLabel = _rating > 0 ? "${_rating.toStringAsFixed(1)} ★" : "No ratings yet";
+    final reviewsSuffix = _totalReviews > 0 ? " ($_totalReviews)" : "";
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -248,10 +352,8 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           CircleAvatar(
             radius: 30,
             backgroundColor: AppColors.bgDarkCard,
-            backgroundImage: (photo != null && photo.isNotEmpty)
-                ? NetworkImage(photo.startsWith('http') ? photo : 'https://psychicheroes.com/$photo')
-                : null,
-            child: (photo == null || photo.isEmpty)
+            backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            child: photoUrl.isEmpty
                 ? Text(
                     initial,
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.accentGold),
@@ -272,17 +374,21 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.verified_rounded, color: AppColors.accentGold, size: 18),
+                    if (isVerified) ...[
+                      const SizedBox(width: 6),
+                      const Icon(Icons.verified_rounded, color: AppColors.accentGold, size: 18),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  bio,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimaryDark),
-                ),
+                if (profileBio.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    profileBio,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textPrimaryDark),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -293,10 +399,15 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
-                        children: const [
-                          Icon(Icons.star_rounded, color: AppColors.accentGold, size: 14),
-                          SizedBox(width: 4),
-                          Text("5.0 ★ Verified", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                        children: [
+                          const Icon(Icons.star_rounded, color: AppColors.accentGold, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isLoadingStats
+                                ? "Loading..."
+                                : "$ratingLabel$reviewsSuffix${isVerified ? ' • Verified' : ''}",
+                            style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ),
@@ -438,6 +549,12 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
   }
 
   Widget _buildMetricsGrid(SessionProvider sessionProv) {
+    final totalAttempts = _totalSessions + _missedOrCancelled;
+    final responseRateStr = totalAttempts > 0
+        ? "${((_totalSessions / totalAttempts) * 100).round()}%"
+        : "—";
+    final ratingStr = _rating > 0 ? "${_rating.toStringAsFixed(1)} ★" : "—";
+
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 10,
@@ -446,10 +563,30 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
-        _buildMetricCard("Today Earnings", "\$${sessionProv.totalEarningsToday.toStringAsFixed(2)}", Icons.account_balance_wallet_rounded, AppColors.onlineGreen),
-        _buildMetricCard("Readings Done", "${sessionProv.completedSessionsToday}", Icons.auto_stories_rounded, AppColors.accentGold),
-        _buildMetricCard("Rating", "5.0 ★", Icons.star_rounded, AppColors.accentCyan),
-        _buildMetricCard("Response Rate", "98%", Icons.bolt_rounded, AppColors.primaryLight),
+        _buildMetricCard(
+          "Today Earnings",
+          _isLoadingStats ? "..." : "\$${sessionProv.totalEarningsToday.toStringAsFixed(2)}",
+          Icons.account_balance_wallet_rounded,
+          AppColors.onlineGreen,
+        ),
+        _buildMetricCard(
+          "Readings Done",
+          _isLoadingStats ? "..." : "${sessionProv.completedSessionsToday}",
+          Icons.auto_stories_rounded,
+          AppColors.accentGold,
+        ),
+        _buildMetricCard(
+          "Rating",
+          _isLoadingStats ? "..." : ratingStr,
+          Icons.star_rounded,
+          AppColors.accentCyan,
+        ),
+        _buildMetricCard(
+          "Response Rate",
+          _isLoadingStats ? "..." : responseRateStr,
+          Icons.bolt_rounded,
+          AppColors.primaryLight,
+        ),
       ],
     );
   }
@@ -489,7 +626,27 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
           tileColor: AppColors.bgDarkCard,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           leading: const Icon(Icons.mail_rounded, color: AppColors.accentGold),
-          title: const Text("Text Reading Requests", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          title: Row(
+            children: [
+              const Flexible(
+                child: Text("Text Reading Requests", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+              if (_pendingTextReadings > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB45309),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "$_pendingTextReadings",
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
+          ),
           subtitle: const Text("Manage pending customer text questions, clarifications & replies", style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 11)),
           trailing: ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB45309)), // Amber-700
@@ -498,7 +655,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AdvisorTextReadingsScreen()),
-              );
+              ).then((_) => _loadDashboardData(silent: true));
             },
           ),
         ),
@@ -516,30 +673,7 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AdvisorPremiumRequestsScreen()),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        ListTile(
-          tileColor: AppColors.bgDarkCard,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          leading: const Icon(Icons.call_outlined, color: AppColors.accentGold),
-          title: const Text("Test Demo Call/Chat Join", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-          subtitle: const Text("Trigger an incoming call request from client", style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 11)),
-          trailing: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentGold),
-            child: const Text("Simulate Request", style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold)),
-            onPressed: () {
-              final user = Provider.of<UserProvider>(context, listen: false).user;
-              sessionProv.initiateSessionRequest(
-                clientId: user?.id ?? "client",
-                clientName: user?.displayName ?? "Client",
-                advisorId: "advisor",
-                advisorName: "Advisor",
-                type: SessionType.chat,
-                ratePerMinute: 0.49,
-              );
+              ).then((_) => _loadDashboardData(silent: true));
             },
           ),
         ),
@@ -547,11 +681,49 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
     );
   }
 
-  Widget _buildRecentSessionsList() {
-    final userProv = Provider.of<UserProvider>(context);
-    final history = userProv.readingHistory;
+  String _mapRequestType(int? reqType) {
+    switch (reqType) {
+      case 1:
+        return "Live Chat";
+      case 2:
+        return "Voice Call";
+      case 3:
+        return "Video Call";
+      case 4:
+        return "Text Reading";
+      default:
+        return "Reading";
+    }
+  }
 
-    if (history.isEmpty) {
+  String _formatDuration(dynamic durationVal) {
+    final mins = (durationVal is num) ? durationVal.toDouble() : (double.tryParse(durationVal?.toString() ?? '') ?? 0.0);
+    if (mins <= 0) return "0m";
+    final wholeMins = mins.floor();
+    final secs = ((mins - wholeMins) * 60).round();
+    if (wholeMins == 0) return "${secs}s";
+    return secs > 0 ? "${wholeMins}m ${secs}s" : "${wholeMins}m";
+  }
+
+  String _formatRequestDate(dynamic dateVal) {
+    if (dateVal == null) return "";
+    try {
+      final dt = DateTime.parse(dateVal.toString()).toLocal();
+      return DateFormat('MMM d, h:mm a').format(dt);
+    } catch (_) {
+      return dateVal.toString();
+    }
+  }
+
+  Widget _buildRecentSessionsList() {
+    if (_isLoadingStats) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(color: AppColors.accentGold)),
+      );
+    }
+
+    if (_recentBookings.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
@@ -573,7 +745,16 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
     }
 
     return Column(
-      children: history.take(5).map((s) {
+      children: _recentBookings.take(10).map((b) {
+        final clientName = (b['clientDisplayName']?.toString().isNotEmpty == true)
+            ? b['clientDisplayName'].toString()
+            : "Client";
+        final typeLabel = _mapRequestType((b['requestType'] as num?)?.toInt());
+        final durationLabel = _formatDuration(b['duration']);
+        final status = b['status']?.toString() ?? '';
+        final amount = ((b['chargedAmount'] as num?) ?? (b['advisorFee'] as num?) ?? 0).toDouble();
+        final dateStr = _formatRequestDate(b['requestOn']);
+
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),
@@ -594,16 +775,21 @@ class _AdvisorDashboardScreenState extends State<AdvisorDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.advisorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
-                    Text("${s.type} • ${s.duration}", style: const TextStyle(fontSize: 11, color: AppColors.textPrimaryDark)),
+                    Text(clientName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                    Text(
+                      "$typeLabel • $durationLabel${status.isNotEmpty ? ' • $status' : ''}",
+                      style: const TextStyle(fontSize: 11, color: AppColors.textPrimaryDark),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text("\$${s.cost.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.onlineGreen)),
-                  Text(s.date, style: const TextStyle(fontSize: 10, color: AppColors.textPrimaryDark)),
+                  Text("\$${amount.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.onlineGreen)),
+                  if (dateStr.isNotEmpty)
+                    Text(dateStr, style: const TextStyle(fontSize: 10, color: AppColors.textPrimaryDark)),
                 ],
               ),
             ],

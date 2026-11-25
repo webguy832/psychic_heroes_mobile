@@ -157,4 +157,48 @@ class AdvisorService {
       return null;
     }
   }
+
+  /// Fetches real advisor dashboard overview stats from api/advisor/dashboard/getdashboard
+  Future<Map<String, dynamic>?> getAdvisorDashboard({String? advisorProfileId}) async {
+    try {
+      final endpoint = (advisorProfileId != null && advisorProfileId.isNotEmpty)
+          ? "${ApiEndpoints.advisorDashboard}/$advisorProfileId"
+          : ApiEndpoints.advisorDashboard;
+      final response = await ApiClient.get(endpoint, requiresAuth: true);
+      if (response is Map<String, dynamic>) {
+        if (response['success'] == true && response['data'] is Map<String, dynamic>) {
+          return response['data'] as Map<String, dynamic>;
+        }
+        if (response.containsKey('quickStats')) {
+          return response;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches real advisor recent client sessions from api/advisor/dashboard/bookings/history
+  Future<List<Map<String, dynamic>>> getAdvisorBookingsHistory({int page = 1, int pageSize = 10}) async {
+    try {
+      final response = await ApiClient.get(
+        ApiEndpoints.advisorBookingsHistory,
+        requiresAuth: true,
+        queryParams: {
+          'page': page.toString(),
+          'pageSize': pageSize.toString(),
+        },
+      );
+      if (response is List) {
+        return response.whereType<Map<String, dynamic>>().toList();
+      }
+      if (response is Map<String, dynamic> && response['data'] is List) {
+        return (response['data'] as List).whereType<Map<String, dynamic>>().toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
 }

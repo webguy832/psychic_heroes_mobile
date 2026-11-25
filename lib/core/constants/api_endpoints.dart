@@ -83,6 +83,7 @@ class ApiEndpoints {
   static const String readingHistory = "api/customer/history";
 
   // Advisor Wallet & History Endpoints (Exact matching web_angular_2025 & .NET 8 backend)
+  static const String advisorDashboard = "api/advisor/dashboard/getdashboard";
   static const String advisorBookingsHistory = "api/advisor/dashboard/bookings/history";
   static const String advisorEarningsHistory = "api/advisor/dashboard/earnings/history";
   static const String advisorWalletSummary = "api/advisor/wallet/summary";
