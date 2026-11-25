@@ -317,7 +317,7 @@ class _CustomerTextReadingScreenState extends State<CustomerTextReadingScreen> {
     final userName = userProv.user?.displayName ?? userProv.user?.screenName ?? "Customer";
 
     final localMsg = ServiceMessageModel(
-      id: DateTime.now().millisecondsSinceEpoch,
+      messageId: DateTime.now().millisecondsSinceEpoch,
       entityId: _readingId,
       entityTypeId: 2,
       messageText: queryText,

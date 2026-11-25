@@ -110,7 +110,7 @@ class _AdvisorPremiumOrderDetailScreenState extends State<AdvisorPremiumOrderDet
 
     // Optimistic UI Append - Shows immediately with zero delay
     final localMsg = ServiceMessageModel(
-      id: DateTime.now().millisecondsSinceEpoch,
+      messageId: DateTime.now().millisecondsSinceEpoch,
       entityId: widget.requestId,
       entityTypeId: 1,
       messageText: text,

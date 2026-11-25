@@ -569,7 +569,7 @@ class _PremiumConversationSheetState extends State<_PremiumConversationSheet> {
 
     // Optimistic UI Append - Message shows immediately with zero wait!
     final localMsg = ServiceMessageModel(
-      id: DateTime.now().millisecondsSinceEpoch,
+      messageId: DateTime.now().millisecondsSinceEpoch,
       entityId: widget.request.id,
       entityTypeId: 1,
       messageText: text,
