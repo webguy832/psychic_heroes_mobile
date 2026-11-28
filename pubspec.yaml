@@ -35,5 +35,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/servicess/
+    - assets/images/zodiac/
     - assets/sounds/
 

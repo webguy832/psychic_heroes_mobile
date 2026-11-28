@@ -7,6 +7,7 @@ import '../../providers/navigation_provider.dart';
 class ZodiacSignInfo {
   final String name;
   final String symbol;
+  final String? assetImage;
   final String dateRange;
   final String daily;
   final String weekly;
@@ -15,6 +16,7 @@ class ZodiacSignInfo {
   const ZodiacSignInfo({
     required this.name,
     required this.symbol,
+    this.assetImage,
     required this.dateRange,
     required this.daily,
     required this.weekly,
@@ -37,6 +39,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Aries',
       symbol: '♈',
+      assetImage: 'assets/images/zodiac/aries.png',
       dateRange: 'Mar 21 - Apr 19',
       daily: 'Today brings new opportunities for personal growth. Trust your intuition when making bold decisions.',
       weekly: 'This week focuses on communication and self-expression. A meaningful conversation opens new doors.',
@@ -45,6 +48,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Taurus',
       symbol: '♉',
+      assetImage: 'assets/images/zodiac/taurus.png',
       dateRange: 'Apr 20 - May 20',
       daily: 'Stability is your keyword today. Stay grounded and take steady steps toward your goals.',
       weekly: 'This week supports material security and thoughtful financial planning.',
@@ -53,6 +57,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Gemini',
       symbol: '♊',
+      assetImage: 'assets/images/zodiac/gemini.png',
       dateRange: 'May 21 - Jun 20',
       daily: 'Your curiosity sparks inspiring connections today. Stay open to unexpected messages.',
       weekly: 'Social energy is high this week; collaborate with people who share your vision.',
@@ -61,6 +66,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Cancer',
       symbol: '♋',
+      assetImage: 'assets/images/zodiac/cancer.png',
       dateRange: 'Jun 21 - Jul 22',
       daily: 'Listen to your heart today. Emotional clarity helps you resolve lingering doubts.',
       weekly: 'Home and family take center stage, bringing warmth and comforting reassurance.',
@@ -69,6 +75,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Leo',
       symbol: '♌',
+      assetImage: 'assets/images/zodiac/leo.png',
       dateRange: 'Jul 23 - Aug 22',
       daily: 'Your natural confidence shines bright today. Step forward and share your talents.',
       weekly: 'Creative projects gain momentum and attract positive recognition.',
@@ -77,6 +84,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Virgo',
       symbol: '♍',
+      assetImage: 'assets/images/zodiac/virgo.png',
       dateRange: 'Aug 23 - Sep 22',
       daily: 'Attention to detail brings a satisfying breakthrough in your daily routine.',
       weekly: 'Organizing your priorities frees up energy for meaningful personal growth.',
@@ -85,6 +93,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Libra',
       symbol: '♎',
+      assetImage: 'assets/images/zodiac/libra.png',
       dateRange: 'Sep 23 - Oct 22',
       daily: 'Harmony and balance guide your interactions today. Seek fair compromises.',
       weekly: 'Partnerships deepen through honest dialogue and mutual appreciation.',
@@ -93,6 +102,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Scorpio',
       symbol: '♏',
+      assetImage: 'assets/images/zodiac/scorpio.png',
       dateRange: 'Oct 23 - Nov 21',
       daily: 'Your intuition is razor-sharp today. Look beneath the surface for hidden truths.',
       weekly: 'A week of empowerment where releasing old habits clears space for growth.',
@@ -101,6 +111,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Sagittarius',
       symbol: '♐',
+      assetImage: 'assets/images/zodiac/sagitarius.png',
       dateRange: 'Nov 22 - Dec 21',
       daily: 'Optimism and adventure call to you today. Embrace fresh perspectives.',
       weekly: 'Opportunities to explore new ideas or travel bring welcome excitement.',
@@ -125,6 +136,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
     ZodiacSignInfo(
       name: 'Pisces',
       symbol: '♓',
+      assetImage: 'assets/images/zodiac/pisces.png',
       dateRange: 'Feb 19 - Mar 20',
       daily: 'Spiritual sensitivity is heightened today. Pay attention to dreams and subtle signs.',
       weekly: 'Gentle reflection and creative flow restore your inner peace.',
@@ -157,12 +169,13 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
         : (_selectedTabIndex == 1 ? selected.weekly : selected.monthly);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          "Astrology & Horoscopes",
+          "Astrology & Horoscope",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
         ),
       ),
@@ -173,53 +186,69 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
           children: [
             const Text(
               "Daily Horoscopes",
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             const Text(
-              "Get personalized cosmic guidance for your zodiac sign",
-              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+              "Get personalized guidance for Daily Horoscopes 2026",
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 13.5),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
-            // Horizontal Zodiac Sign Selector
+            // Horizontal Zodiac Sign Selector (matching web app cards)
             SizedBox(
-              height: 120,
+              height: 132,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _signs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (ctx, index) {
                   final sign = _signs[index];
                   final isSelected = index == _selectedSignIndex;
                   return GestureDetector(
                     onTap: () => setState(() => _selectedSignIndex = index),
                     child: Container(
-                      width: 108,
+                      width: 112,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.bgDarkCard,
+                        color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isSelected ? AppColors.accentGold : AppColors.borderDark,
+                          color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
                           width: isSelected ? 1.8 : 1,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            sign.symbol,
-                            style: TextStyle(
-                              fontSize: 28,
-                              color: isSelected ? AppColors.accentGold : Colors.white,
+                          if (sign.assetImage != null)
+                            Image.asset(
+                              sign.assetImage!,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Text(
+                                sign.symbol,
+                                style: const TextStyle(fontSize: 32, color: AppColors.primary),
+                              ),
+                            )
+                          else
+                            Text(
+                              sign.symbol,
+                              style: const TextStyle(fontSize: 32, color: AppColors.primary),
                             ),
-                          ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Text(
                             sign.name.toUpperCase(),
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isSelected ? const Color(0xFF312E81) : const Color(0xFF0F172A),
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                               letterSpacing: 0.4,
@@ -230,7 +259,7 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
                           const SizedBox(height: 2),
                           Text(
                             sign.dateRange,
-                            style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 9.5),
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -242,102 +271,103 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // Selected Sign Horoscope Card
+            // Selected Sign Header + Tabs (matching web app underline tabs)
+            Text(
+              selected.name.toUpperCase(),
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              child: Row(
+                children: List.generate(tabTitles.length, (i) {
+                  final active = _selectedTabIndex == i;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedTabIndex = i),
+                    child: Container(
+                      padding: const EdgeInsets.only(right: 24, bottom: 10, top: 4),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: active ? const Color(0xFF4F46E5) : Colors.transparent,
+                            width: 2.2,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        tabTitles[i],
+                        style: TextStyle(
+                          color: active ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                          fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            // Forecast Content Card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppColors.bgDarkCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.borderDark),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        selected.symbol,
-                        style: const TextStyle(fontSize: 30, color: AppColors.accentGold),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            selected.name.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            selected.dateRange,
-                            style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Daily / Weekly / Monthly Tabs
-                  Row(
-                    children: List.generate(tabTitles.length, (i) {
-                      final active = _selectedTabIndex == i;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: ChoiceChip(
-                          label: Text(tabTitles[i]),
-                          selected: active,
-                          selectedColor: AppColors.accentGold,
-                          backgroundColor: AppColors.bgDark,
-                          labelStyle: TextStyle(
-                            color: active ? Colors.black : AppColors.textPrimaryDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12.5,
-                          ),
-                          onSelected: (_) => setState(() => _selectedTabIndex = i),
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 16),
-
                   Text(
-                    "${tabTitles[_selectedTabIndex]} Forecast for ${selected.name}",
+                    "Horoscope for ${tabTitles[_selectedTabIndex].toLowerCase()} — ${selected.name}",
                     style: const TextStyle(
-                      color: AppColors.accentGold,
+                      color: Color(0xFF0F172A),
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 16,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     content,
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.55,
+                      color: Color(0xFF475569),
+                      fontSize: 14.5,
+                      height: 1.6,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
 
-            // CTA to connect with an Astrology Advisor
+            // CTA Banner matching Psychic Heroes purple & green
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.accentGold.withOpacity(0.35)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,25 +379,22 @@ class _HoroscopesScreenState extends State<HoroscopesScreen> {
                   const SizedBox(height: 6),
                   const Text(
                     "Connect live with experienced astrologers for synastry, transits, and cosmic timing insights.",
-                    style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 13),
+                    style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13),
                   ),
                   const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF369A23),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                      label: const Text(
-                        "BROWSE ASTROLOGY ADVISORS",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      onPressed: _browseAstrologyAdvisors,
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF369A23),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                    label: const Text(
+                      "BROWSE ASTROLOGY ADVISORS",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    onPressed: _browseAstrologyAdvisors,
                   ),
                 ],
               ),
