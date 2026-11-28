@@ -166,7 +166,9 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
                           ),
                         ),
                         Text(
-                          nav.isDevMode ? "All menus & tabs visible" : "Only Home & Profile visible",
+                          nav.isDevMode
+                              ? "All menus & tabs visible"
+                              : (auth.isLoggedIn ? "Member menus unlocked" : "Sign in to unlock member menus"),
                           style: const TextStyle(
                             color: AppColors.textSecondaryDark,
                             fontSize: 10,
@@ -192,8 +194,8 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: isAdvisor
-                  ? _buildAdvisorMenuItems(context, nav)
-                  : _buildCustomerMenuItems(context, nav),
+                  ? _buildAdvisorMenuItems(context, nav, auth.isLoggedIn)
+                  : _buildCustomerMenuItems(context, nav, auth.isLoggedIn),
             ),
           ),
 
@@ -264,8 +266,10 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
     );
   }
 
-  List<Widget> _buildCustomerMenuItems(BuildContext context, NavigationProvider nav) {
-    if (!nav.isDevMode) {
+  List<Widget> _buildCustomerMenuItems(BuildContext context, NavigationProvider nav, bool isLoggedIn) {
+    final showMemberMenus = isLoggedIn || nav.isDevMode;
+
+    if (!showMemberMenus) {
       return [
         _buildDrawerTile(
           icon: Icons.home_rounded,
@@ -275,12 +279,55 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
             Navigator.pop(context);
           },
         ),
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            iconColor: AppColors.accentGold,
+            collapsedIconColor: AppColors.textSecondaryDark,
+            leading: const Icon(Icons.psychology_rounded, color: AppColors.accentCyan, size: 20),
+            title: const Text(
+              "Services",
+              style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w500, fontSize: 13.5),
+            ),
+            children: _servicesList.map((service) {
+              return ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.only(left: 48, right: 16),
+                title: Text(
+                  service,
+                  style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12.5),
+                ),
+                onTap: () {
+                  nav.setTab(0);
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+        ),
         _buildDrawerTile(
-          icon: Icons.person_rounded,
-          title: "Profile",
+          icon: Icons.diamond_outlined,
+          title: "Platinum Luxe Services",
+          badgeText: "EXCLUSIVE",
           onTap: () {
             nav.setTab(1);
             Navigator.pop(context);
+          },
+        ),
+        _buildDrawerTile(
+          icon: Icons.insights_rounded,
+          title: "Insights & Horoscopes",
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const InsightsScreen()));
+          },
+        ),
+        _buildDrawerTile(
+          icon: Icons.help_outline_rounded,
+          title: "Help & Support",
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen()));
           },
         ),
       ];
@@ -328,8 +375,12 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         icon: Icons.forum_rounded,
         title: "Advisor Chat Inbox",
         onTap: () {
-          nav.setTab(1);
           Navigator.pop(context);
+          if (nav.isDevMode) {
+            nav.setTab(2);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const AdvisorMessagesScreen()));
+          }
         },
       ),
       _buildDrawerTile(
@@ -380,8 +431,12 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         icon: Icons.auto_stories_rounded,
         title: "Reading History",
         onTap: () {
-          nav.setTab(2);
           Navigator.pop(context);
+          if (nav.isDevMode) {
+            nav.setTab(3);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()));
+          }
         },
       ),
       _buildDrawerTile(
@@ -412,7 +467,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         icon: Icons.person_rounded,
         title: "Profile",
         onTap: () {
-          nav.setTab(4);
+          nav.setTab(nav.isDevMode ? 4 : 2);
           Navigator.pop(context);
         },
       ),
@@ -435,8 +490,10 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
     ];
   }
 
-  List<Widget> _buildAdvisorMenuItems(BuildContext context, NavigationProvider nav) {
-    if (!nav.isDevMode) {
+  List<Widget> _buildAdvisorMenuItems(BuildContext context, NavigationProvider nav, bool isLoggedIn) {
+    final showMemberMenus = isLoggedIn || nav.isDevMode;
+
+    if (!showMemberMenus) {
       return [
         _buildDrawerTile(
           icon: Icons.home_rounded,
@@ -447,11 +504,11 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
           },
         ),
         _buildDrawerTile(
-          icon: Icons.person_rounded,
-          title: "Profile",
+          icon: Icons.help_outline_rounded,
+          title: "Help & Support",
           onTap: () {
-            nav.setTab(1);
             Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen()));
           },
         ),
       ];
@@ -488,16 +545,20 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         icon: Icons.forum_rounded,
         title: "Client Messages",
         onTap: () {
-          nav.setTab(1);
           Navigator.pop(context);
+          if (nav.isDevMode) {
+            nav.setTab(2);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const AdvisorMessagesScreen()));
+          }
         },
       ),
       _buildDrawerTile(
         icon: Icons.workspace_premium_rounded,
         title: "My Services & Rates",
         onTap: () {
-          nav.setTab(2);
           Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const MyServicesScreen()));
         },
       ),
       _buildDrawerTile(
@@ -505,14 +566,18 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
         title: "Reading History",
         onTap: () {
           Navigator.pop(context);
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()));
+          if (nav.isDevMode) {
+            nav.setTab(3);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()));
+          }
         },
       ),
       _buildDrawerTile(
         icon: Icons.person_rounded,
         title: "Profile",
         onTap: () {
-          nav.setTab(4);
+          nav.setTab(nav.isDevMode ? 4 : 2);
           Navigator.pop(context);
         },
       ),
