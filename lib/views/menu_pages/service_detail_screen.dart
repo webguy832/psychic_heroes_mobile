@@ -492,7 +492,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
               child: photoUrl.isEmpty
                   ? Text(
-                      adv.displayName.isNotEmpty ? adv.displayName[0].toUpperCase() : 'A',
+                      adv.name.isNotEmpty ? adv.name[0].toUpperCase() : 'A',
                       style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 18),
                     )
                   : null,
@@ -501,7 +501,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               children: [
                 Flexible(
                   child: Text(
-                    adv.displayName,
+                    adv.name,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -519,7 +519,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               children: [
                 const SizedBox(height: 2),
                 Text(
-                  adv.specialties.isNotEmpty ? adv.specialties.join(', ') : _info.title,
+                  (adv.specialities != null && adv.specialities!.isNotEmpty)
+                      ? adv.specialities!
+                      : ((adv.categoryName != null && adv.categoryName!.isNotEmpty)
+                          ? adv.categoryName!
+                          : _info.title),
                   style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11.5),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
