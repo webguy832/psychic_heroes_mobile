@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../models/category_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/home_provider.dart';
 import '../../providers/user_provider.dart';
@@ -23,6 +22,8 @@ import '../menu_pages/my_services_screen.dart';
 import '../menu_pages/settings_screen.dart';
 import '../menu_pages/help_support_screen.dart';
 import '../menu_pages/customer_premium_requests_screen.dart';
+import '../menu_pages/service_detail_screen.dart';
+import '../menu_pages/horoscopes_screen.dart';
 import '../advisors/advisor_premium_requests_screen.dart';
 import '../advisors/premium_services_browse_screen.dart';
 import '../shared/app_logo.dart';
@@ -35,17 +36,15 @@ class AppDrawerMenu extends StatefulWidget {
 }
 
 class _AppDrawerMenuState extends State<AppDrawerMenu> {
-  bool _isServicesExpanded = false;
-
-  final List<String> _servicesList = [
-    "Tarot Reading",
-    "Love & Relationship",
-    "Astrology & Zodiac",
-    "Mediumship & Spirit",
-    "Psychic Readings",
-    "Palmistry & Fortune",
-    "Crystal Healing",
-    "Dream Analysis"
+  final List<Map<String, String>> _webServicesMenu = const [
+    {'title': 'Premium Services', 'type': 'premium'},
+    {'title': 'Psychic Reading', 'type': 'psychic'},
+    {'title': 'Tarot Card Reading', 'type': 'tarot'},
+    {'title': 'Astrology & Horoscope', 'type': 'horoscopes'},
+    {'title': 'Love & Relationships Guidance', 'type': 'love'},
+    {'title': 'Career & Money Insight', 'type': 'career'},
+    {'title': 'Spiritual & Healing Sessions', 'type': 'spiritual'},
+    {'title': 'Dreams & Numerology Readings', 'type': 'dream'},
   ];
 
   @override
@@ -270,8 +269,6 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
   }
 
   Widget _buildServicesExpansionTile(BuildContext context, NavigationProvider nav, HomeProvider homeProv) {
-    final apiCategories = homeProv.categories;
-
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
@@ -282,86 +279,38 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
           "Services",
           style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w500, fontSize: 13.5),
         ),
-        children: apiCategories.isNotEmpty
-            ? [
-                ListTile(
-                  dense: true,
-                  contentPadding: const EdgeInsets.only(left: 48, right: 16),
-                  title: Text(
-                    "All Specialties",
-                    style: TextStyle(
-                      color: homeProv.selectedCategoryId == null ? AppColors.accentGold : AppColors.textSecondaryDark,
-                      fontWeight: homeProv.selectedCategoryId == null ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                  onTap: () {
-                    homeProv.selectCategory(null);
-                    homeProv.searchAdvisors('');
-                    nav.setTab(0);
-                    Navigator.pop(context);
-                  },
-                ),
-                ...apiCategories.map((CategoryDto cat) {
-                  final isSelected = homeProv.selectedCategoryId == cat.id;
-                  return ListTile(
-                    dense: true,
-                    contentPadding: const EdgeInsets.only(left: 48, right: 16),
-                    title: Text(
-                      cat.name,
-                      style: TextStyle(
-                        color: isSelected ? AppColors.accentGold : AppColors.textSecondaryDark,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                    onTap: () {
-                      homeProv.selectCategory(cat.id);
-                      nav.setTab(0);
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Showing advisors for ${cat.name}"),
-                          duration: const Duration(seconds: 2),
-                          backgroundColor: AppColors.primary,
-                        ),
-                      );
-                    },
-                  );
-                }),
-              ]
-            : _servicesList.map((service) {
-                return ListTile(
-                  dense: true,
-                  contentPadding: const EdgeInsets.only(left: 48, right: 16),
-                  title: Text(
-                    service,
-                    style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12.5),
-                  ),
-                  onTap: () {
-                    final lower = service.toLowerCase();
-                    final keyword = lower.split(' ').first;
-                    final match = homeProv.categories.where(
-                      (c) => c.name.toLowerCase().contains(keyword),
-                    );
-                    if (match.isNotEmpty) {
-                      homeProv.selectCategory(match.first.id);
-                    } else {
-                      homeProv.selectCategory(null);
-                      homeProv.searchAdvisors(keyword);
-                    }
-                    nav.setTab(0);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("Showing advisors for $service"),
-                        duration: const Duration(seconds: 2),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
-                  },
+        children: _webServicesMenu.map((item) {
+          final title = item['title']!;
+          final type = item['type']!;
+          return ListTile(
+            dense: true,
+            contentPadding: const EdgeInsets.only(left: 48, right: 16),
+            title: Text(
+              title,
+              style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12.5),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark, size: 16),
+            onTap: () {
+              Navigator.pop(context);
+              if (type == 'premium') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PremiumServicesBrowseScreen(showBackButton: true)),
                 );
-              }).toList(),
+              } else if (type == 'horoscopes') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HoroscopesScreen()),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ServiceDetailScreen(serviceType: type)),
+                );
+              }
+            },
+          );
+        }).toList(),
       ),
     );
   }
