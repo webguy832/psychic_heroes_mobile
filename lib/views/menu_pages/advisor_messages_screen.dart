@@ -82,10 +82,11 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: const Text("Advisor Chat Messages", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
       ),
       body: SingleChildScrollView(
@@ -100,16 +101,16 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.borderDark),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: TextField(
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Color(0xFF0F172A)),
                       decoration: const InputDecoration(
-                        icon: Icon(Icons.search_rounded, color: AppColors.textSecondaryDark),
+                        icon: Icon(Icons.search_rounded, color: Color(0xFF64748B)),
                         hintText: "Search conversations or advisor name...",
-                        hintStyle: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                         border: InputBorder.none,
                       ),
                       onChanged: (val) => setState(() => _searchQuery = val),
@@ -122,14 +123,18 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
                       ? Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(color: AppColors.bgDarkCard, borderRadius: BorderRadius.circular(16)),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
                           child: Column(
                             children: const [
-                              Icon(Icons.forum_rounded, color: AppColors.textSecondaryDark, size: 44),
+                              Icon(Icons.forum_rounded, color: Color(0xFF94A3B8), size: 44),
                               SizedBox(height: 12),
-                              Text("No Messages Found", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                              Text("No Messages Found", style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 15)),
                               SizedBox(height: 4),
-                              Text("Start a live chat with an advisor to send messages.", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                              Text("Start a live chat with an advisor to send messages.", style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                             ],
                           ),
                         )
@@ -144,9 +149,12 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: AppColors.bgDarkCard,
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: unread > 0 ? AppColors.accentGold.withOpacity(0.5) : AppColors.borderDark),
+                                border: Border.all(color: unread > 0 ? AppColors.primary : const Color(0xFFE2E8F0)),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                                ],
                               ),
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -177,7 +185,7 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
                                           decoration: BoxDecoration(
                                             color: AppColors.onlineGreen,
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: AppColors.bgDarkCard, width: 2),
+                                            border: Border.all(color: Colors.white, width: 2),
                                           ),
                                         ),
                                       ),
@@ -186,20 +194,20 @@ class _AdvisorMessagesScreenState extends State<AdvisorMessagesScreen> {
                                 title: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(thread['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                                    Text(thread['time'] as String, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                    Text(thread['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                                    Text(thread['time'] as String, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
                                   ],
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 2),
-                                    Text(thread['specialty'] as String, style: const TextStyle(color: AppColors.accentGold, fontSize: 11, fontWeight: FontWeight.w600)),
+                                    Text(thread['specialty'] as String, style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
                                     const SizedBox(height: 4),
                                     Text(
                                       thread['lastMessage'] as String,
                                       style: TextStyle(
-                                        color: unread > 0 ? Colors.white : AppColors.textPrimaryDark,
+                                        color: unread > 0 ? const Color(0xFF0F172A) : const Color(0xFF475569),
                                         fontWeight: unread > 0 ? FontWeight.bold : FontWeight.normal,
                                         fontSize: 12,
                                       ),

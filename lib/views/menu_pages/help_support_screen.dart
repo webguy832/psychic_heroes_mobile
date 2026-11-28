@@ -73,22 +73,22 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgDarkCard,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: const [
-            Icon(Icons.mark_email_read_rounded, color: AppColors.onlineGreen, size: 28),
+            Icon(Icons.mark_email_read_rounded, color: Color(0xFF16A34A), size: 28),
             SizedBox(width: 8),
-            Text("Ticket Submitted!", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("Ticket Submitted!", style: TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Text(
           "Thank you for contacting us! Support Ticket #TCK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)} has been created under category '$_selectedCategory'. Our support team will reply within 2 hours.",
-          style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13),
+          style: const TextStyle(color: Color(0xFF475569), fontSize: 13.5),
         ),
         actions: [
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF369A23)),
             onPressed: () {
               Navigator.pop(ctx);
               _subjectController.clear();
@@ -110,10 +110,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: const Text("Help Center & 24/7 Support", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
       ),
       body: SingleChildScrollView(
@@ -128,9 +129,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: AppColors.cardGradient,
+                      gradient: AppColors.primaryGradient,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.borderGold.withOpacity(0.5)),
                     ),
                     child: Row(
                       children: [
@@ -146,7 +146,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                             children: const [
                               Text("24/7 Psychic Customer Care", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                               SizedBox(height: 4),
-                              Text("We are here to assist with billing, session questions, or technical help anytime.", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                              Text("We are here to assist with billing, session questions, or technical help anytime.", style: TextStyle(color: Colors.white70, fontSize: 12)),
                             ],
                           ),
                         ),
@@ -156,24 +156,24 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
                   const SizedBox(height: 24),
 
-                  const Text("Frequently Asked Questions (FAQ)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const Text("Frequently Asked Questions (FAQ)", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   const SizedBox(height: 10),
 
                   // FAQ Search Box
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.borderDark),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: TextField(
                       controller: _searchController,
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Color(0xFF0F172A)),
                       decoration: const InputDecoration(
-                        icon: Icon(Icons.search_rounded, color: AppColors.textSecondaryDark),
+                        icon: Icon(Icons.search_rounded, color: Color(0xFF64748B)),
                         hintText: "Search help topics or questions...",
-                        hintStyle: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                         border: InputBorder.none,
                       ),
                       onChanged: (_) => setState(() {}),
@@ -192,20 +192,20 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.bgDarkCard,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.borderDark),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: ExpansionTile(
-                          iconColor: AppColors.accentGold,
-                          collapsedIconColor: AppColors.textSecondaryDark,
-                          title: Text(faq['question']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                          iconColor: AppColors.primary,
+                          collapsedIconColor: const Color(0xFF64748B),
+                          title: Text(faq['question']!, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 13.5)),
                           children: [
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                               child: Text(
                                 faq['answer']!,
-                                style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12.5, height: 1.4),
+                                style: const TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.45),
                               ),
                             ),
                           ],
@@ -216,25 +216,25 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
                   const SizedBox(height: 28),
 
-                  const Text("Submit Support Ticket", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const Text("Submit Support Ticket", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   const SizedBox(height: 4),
-                  const Text("Cannot find your answer above? Send a direct message to our support team.", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                  const Text("Cannot find your answer above? Send a direct message to our support team.", style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5)),
                   const SizedBox(height: 14),
 
                   // Category Selector Dropdown
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.borderDark),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: _selectedCategory,
                         isExpanded: true,
-                        dropdownColor: AppColors.bgDarkCard,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                        dropdownColor: Colors.white,
+                        style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14),
                         items: const [
                           DropdownMenuItem(value: "General Inquiry", child: Text("General Inquiry")),
                           DropdownMenuItem(value: "Billing & Refunds", child: Text("Billing & Wallet Refund")),

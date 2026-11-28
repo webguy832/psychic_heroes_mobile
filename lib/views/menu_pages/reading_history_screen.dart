@@ -42,10 +42,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: Text(
           isAdvisor ? "Client Reading & Session History" : "Reading & Session History",
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
@@ -53,15 +54,15 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         actions: [
           IconButton(
             tooltip: "Refresh History",
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: () => userProv.fetchReadingHistory(),
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async => userProv.fetchReadingHistory(),
-        color: AppColors.accentGold,
-        backgroundColor: AppColors.bgDarkCard,
+        color: AppColors.primary,
+        backgroundColor: Colors.white,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -75,18 +76,18 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
-                        color: AppColors.bgDarkCard,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.borderDark),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: TextField(
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
-                          icon: const Icon(Icons.search_rounded, color: AppColors.textSecondaryDark),
+                          icon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
                           hintText: isAdvisor
                               ? "Search by client name or session topic..."
                               : "Search by advisor or session topic...",
-                          hintStyle: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           border: InputBorder.none,
                         ),
                         onChanged: (val) => setState(() => _searchQuery = val),
@@ -127,21 +128,25 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                             ? Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(32),
-                                decoration: BoxDecoration(color: AppColors.bgDarkCard, borderRadius: BorderRadius.circular(16)),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
                                 child: Column(
                                   children: [
-                                    const Icon(Icons.auto_stories_rounded, color: AppColors.textSecondaryDark, size: 48),
+                                    const Icon(Icons.auto_stories_rounded, color: Color(0xFF94A3B8), size: 48),
                                     const SizedBox(height: 12),
                                     Text(
                                       isAdvisor ? "No Client Sessions Found" : "No Reading History Found",
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       isAdvisor
                                           ? "Completed client sessions and readings will appear here."
                                           : "Completed sessions and transcripts will appear here.",
-                                      style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
                                       textAlign: TextAlign.center,
                                     ),
                                   ],
@@ -155,16 +160,19 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                                   final item = filtered[i];
                                   final isVideo = item.typeKey.toLowerCase() == 'video';
                                   final isVoice = item.typeKey.toLowerCase() == 'voice';
-                                  final itemColor = isVideo ? AppColors.accentCyan : (isVoice ? AppColors.onlineGreen : AppColors.accentGold);
+                                  final itemColor = isVideo ? const Color(0xFF4F46E5) : (isVoice ? const Color(0xFF16A34A) : AppColors.primary);
                                   final itemIcon = isVideo ? Icons.videocam_rounded : (isVoice ? Icons.phone_in_talk_rounded : Icons.chat_bubble_rounded);
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 14),
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: AppColors.bgDarkCard,
+                                      color: Colors.white,
                                       borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(color: AppColors.borderDark),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      boxShadow: [
+                                        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                                      ],
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +182,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                                             Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: itemColor.withOpacity(0.15),
+                                                color: itemColor.withOpacity(0.12),
                                                 shape: BoxShape.circle,
                                               ),
                                               child: Icon(itemIcon, color: itemColor, size: 20),
@@ -184,39 +192,39 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                                                  Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     "${isAdvisor ? 'Client' : 'Advisor'}: ${item.advisorName}",
-                                                    style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 12),
+                                                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
                                                   ),
                                                 ],
                                               ),
                                             ),
                                             Text(
                                               "\$${item.cost.toStringAsFixed(2)}",
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.onlineGreen),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF16A34A)),
                                             ),
                                           ],
                                         ),
                                         const SizedBox(height: 12),
-                                        Text(item.summary, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, height: 1.3)),
+                                        Text(item.summary, style: const TextStyle(color: Color(0xFF475569), fontSize: 12.5, height: 1.4)),
                                         const SizedBox(height: 12),
-                                        const Divider(color: AppColors.borderDark, height: 1),
+                                        const Divider(color: Color(0xFFE2E8F0), height: 1),
                                         const SizedBox(height: 10),
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Row(
                                               children: [
-                                                const Icon(Icons.access_time_rounded, color: AppColors.textSecondaryDark, size: 14),
+                                                const Icon(Icons.access_time_rounded, color: Color(0xFF64748B), size: 14),
                                                 const SizedBox(width: 4),
-                                                Text("${item.duration} • ${item.date}", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                                Text("${item.duration} • ${item.date}", style: const TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                                               ],
                                             ),
                                             ElevatedButton.icon(
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppColors.primaryLight,
+                                                backgroundColor: AppColors.primary,
                                                 foregroundColor: Colors.white,
                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                                 minimumSize: Size.zero,
@@ -264,11 +272,12 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
     return ChoiceChip(
       selected: isSelected,
       label: Text(label),
-      selectedColor: AppColors.accentGold,
-      backgroundColor: AppColors.bgDarkCard,
+      selectedColor: AppColors.primary,
+      backgroundColor: Colors.white,
+      side: BorderSide(color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0)),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.black : Colors.white,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.white : const Color(0xFF334155),
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
         fontSize: 12,
       ),
       onSelected: (_) => setState(() => _selectedCategory = value),

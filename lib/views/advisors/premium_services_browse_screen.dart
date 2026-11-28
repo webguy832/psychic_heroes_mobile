@@ -78,9 +78,9 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkHeader,
+        backgroundColor: AppColors.primary,
         elevation: 0,
         automaticallyImplyLeading: widget.showBackButton,
         leading: widget.showBackButton
@@ -121,7 +121,7 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,
-        color: AppColors.accentGold,
+        color: AppColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -148,15 +148,15 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
                           ? "All Premium Offerings (${_services.length})"
                           : "Filtered Offerings (${_services.length})",
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                        color: Color(0xFF0F172A),
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     if (_selectedCategoryId != 0)
                       TextButton(
                         onPressed: () => _filterByCategory(0),
-                        child: const Text("Show All", style: TextStyle(color: AppColors.accentGold, fontSize: 12)),
+                        child: const Text("Show All", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -167,7 +167,7 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
               if (_isLoading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 40.0),
-                  child: Center(child: CircularProgressIndicator(color: AppColors.accentGold)),
+                  child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
                 )
               else if (_services.isEmpty)
                 _buildEmptyState()
@@ -258,12 +258,13 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
             return ChoiceChip(
               label: const Text("All Services"),
               selected: isSel,
-              selectedColor: AppColors.accentGold,
-              backgroundColor: AppColors.bgDarkCard,
+              selectedColor: AppColors.primary,
+              backgroundColor: Colors.white,
+              side: BorderSide(color: isSel ? AppColors.primary : const Color(0xFFE2E8F0)),
               labelStyle: TextStyle(
-                color: isSel ? Colors.black : Colors.white70,
+                color: isSel ? Colors.white : const Color(0xFF334155),
                 fontSize: 12,
-                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
               ),
               onSelected: (_) => _filterByCategory(0),
             );
@@ -275,12 +276,13 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
           return ChoiceChip(
             label: Text(cat.title),
             selected: isSel,
-            selectedColor: AppColors.accentGold,
-            backgroundColor: AppColors.bgDarkCard,
+            selectedColor: AppColors.primary,
+            backgroundColor: Colors.white,
+            side: BorderSide(color: isSel ? AppColors.primary : const Color(0xFFE2E8F0)),
             labelStyle: TextStyle(
-              color: isSel ? Colors.black : Colors.white70,
+              color: isSel ? Colors.white : const Color(0xFF334155),
               fontSize: 12,
-              fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
             ),
             onSelected: (_) => _filterByCategory(cat.id),
           );
@@ -302,16 +304,23 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
 
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.bgDarkCard,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.borderDark),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Top Header with Advisor Info & Price
               Padding(
-                padding: const EdgeInsets.all(14.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -319,33 +328,33 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         CircleAvatar(
-                          radius: 20,
-                          backgroundColor: AppColors.primary,
+                          radius: 22,
+                          backgroundColor: const Color(0xFFF3E8FF),
                           backgroundImage: advPhotoUrl.isNotEmpty ? NetworkImage(advPhotoUrl) : null,
                           child: advPhotoUrl.isEmpty
                               ? Text(
                                   (s.advisorDisplayName != null && s.advisorDisplayName!.isNotEmpty)
                                       ? s.advisorDisplayName![0].toUpperCase()
                                       : 'A',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
                                 )
                               : null,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 s.advisorDisplayName ?? "Psychic Master",
-                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14.5, fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 2),
                               Row(
                                 children: const [
-                                  Icon(Icons.star, color: AppColors.accentGold, size: 13),
+                                  Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
                                   SizedBox(width: 3),
-                                  Text("5.0 Verified Advisor", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                  Text("5.0 Verified Advisor", style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                                 ],
                               ),
                             ],
@@ -357,14 +366,14 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
                             Text(
                               "\$${s.price.toStringAsFixed(2)}",
                               style: const TextStyle(
-                                color: AppColors.accentGold,
+                                color: Color(0xFF16A34A),
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
                               "${s.duration} ${s.duration == 1 ? 'day' : 'days'} delivery",
-                              style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
+                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                             ),
                           ],
                         ),
@@ -373,7 +382,7 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
                     const SizedBox(height: 12),
                     Text(
                       s.title,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16.5, fontWeight: FontWeight.bold),
                     ),
                     if (s.serviceDescription != null && s.serviceDescription!.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -381,7 +390,7 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
                         s.serviceDescription!,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12.5, height: 1.4),
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, height: 1.45),
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -389,12 +398,12 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accentGold,
-                          foregroundColor: Colors.black,
+                          backgroundColor: const Color(0xFF369A23),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        icon: const Icon(Icons.diamond_rounded, size: 16, color: Colors.black),
+                        icon: const Icon(Icons.diamond_rounded, size: 16, color: Colors.white),
                         label: Text(
                           "Order Service - \$${s.price.toStringAsFixed(2)}",
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
@@ -425,22 +434,35 @@ class _PremiumServicesBrowseScreenState extends State<PremiumServicesBrowseScree
   }
 
   Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 36.0, horizontal: 20.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
       child: Center(
         child: Column(
-          children: const [
-            Icon(Icons.diamond_outlined, color: Colors.white24, size: 48),
-            SizedBox(height: 12),
-            Text(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E8FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.diamond_outlined, color: AppColors.primary, size: 36),
+            ),
+            const SizedBox(height: 14),
+            const Text(
               "No premium services available in this category yet.",
-              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 4),
-            Text(
+            const SizedBox(height: 6),
+            const Text(
               "Select 'All Services' or check back soon as verified advisors publish new rituals.",
-              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11.5),
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, height: 1.4),
               textAlign: TextAlign.center,
             ),
           ],

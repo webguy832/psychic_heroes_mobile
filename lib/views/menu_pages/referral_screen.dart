@@ -98,10 +98,11 @@ class _ReferralScreenState extends State<ReferralScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: const Text("Referrals & Karma Rewards", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
       ),
       body: SingleChildScrollView(
@@ -119,7 +120,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                       gradient: AppColors.primaryGradient,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.primary.withOpacity(0.22), blurRadius: 16, offset: const Offset(0, 4)),
                       ],
                     ),
                     child: Column(
@@ -147,15 +148,15 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildStatTile("Total Earned", "\$${referralEarned.toStringAsFixed(2)}", Icons.payments_rounded, AppColors.onlineGreen),
+                        child: _buildStatTile("Total Earned", "\$${referralEarned.toStringAsFixed(2)}", Icons.payments_rounded, const Color(0xFF16A34A)),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildStatTile("Friends Joined", "$referralCount ${referralCount == 1 ? 'Friend' : 'Friends'}", Icons.people_alt_rounded, AppColors.accentCyan),
+                        child: _buildStatTile("Friends Joined", "$referralCount ${referralCount == 1 ? 'Friend' : 'Friends'}", Icons.people_alt_rounded, const Color(0xFF4F46E5)),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildStatTile("Karma Points", "${userProv.karmaPoints} Pts", Icons.stars_rounded, AppColors.accentGold),
+                        child: _buildStatTile("Karma Points", "${userProv.karmaPoints} Pts", Icons.stars_rounded, const Color(0xFFD97706)),
                       ),
                     ],
                   ),
@@ -166,24 +167,27 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.borderGold.withOpacity(0.5)),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                      ],
                     ),
                     child: Column(
                       children: [
-                        const Text("Your Unique Referral Code", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const Text("Your Unique Referral Code", style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: AppColors.bgDark,
+                            color: const Color(0xFFF3E8FF),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.borderDark),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.25)),
                           ),
                           child: SelectableText(
                             referralCode,
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.accentGold, letterSpacing: 2),
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 2),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -206,11 +210,11 @@ class _ReferralScreenState extends State<ReferralScreen> {
                               child: CustomButton(
                                 text: "Share Link",
                                 icon: Icons.share_rounded,
-                                backgroundColor: AppColors.accentCyan,
+                                backgroundColor: AppColors.primary,
                                 onPressed: () {
                                   Clipboard.setData(ClipboardData(text: referralLink));
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Referral link copied to clipboard: $referralLink"), backgroundColor: AppColors.accentCyan),
+                                    SnackBar(content: Text("Referral link copied to clipboard: $referralLink"), backgroundColor: AppColors.primary),
                                   );
                                 },
                               ),
@@ -223,7 +227,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
                   const SizedBox(height: 28),
 
-                  const Text("Redeem Karma Rewards Catalog", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const Text("Redeem Karma Rewards Catalog", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   const SizedBox(height: 12),
 
                   // Rewards Catalog Grid
@@ -239,16 +243,19 @@ class _ReferralScreenState extends State<ReferralScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: AppColors.bgDarkCard,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.borderDark),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                          ],
                         ),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), shape: BoxShape.circle),
-                              child: Icon(item['icon'] as IconData, color: AppColors.accentGold, size: 24),
+                              decoration: const BoxDecoration(color: Color(0xFFF3E8FF), shape: BoxShape.circle),
+                              child: Icon(item['icon'] as IconData, color: AppColors.primary, size: 24),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
@@ -257,21 +264,23 @@ class _ReferralScreenState extends State<ReferralScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                                      Flexible(
+                                        child: Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+                                      ),
                                       const SizedBox(width: 6),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: AppColors.accentCyan.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                                        child: Text(item['badge'] as String, style: const TextStyle(color: AppColors.accentCyan, fontSize: 8, fontWeight: FontWeight.bold)),
+                                        decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(6)),
+                                        child: Text(item['badge'] as String, style: const TextStyle(color: Color(0xFF4F46E5), fontSize: 8.5, fontWeight: FontWeight.bold)),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      const Icon(Icons.stars_rounded, color: AppColors.accentGold, size: 14),
+                                      const Icon(Icons.stars_rounded, color: Color(0xFFD97706), size: 14),
                                       const SizedBox(width: 4),
-                                      Text("${item['points']} Points Required", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                      Text("${item['points']} Points Required", style: const TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                                     ],
                                   ),
                                 ],
@@ -279,8 +288,8 @@ class _ReferralScreenState extends State<ReferralScreen> {
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: canClaim ? AppColors.onlineGreen : Colors.white12,
-                                foregroundColor: Colors.white,
+                                backgroundColor: canClaim ? const Color(0xFF369A23) : const Color(0xFFE2E8F0),
+                                foregroundColor: canClaim ? Colors.white : const Color(0xFF64748B),
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
@@ -306,9 +315,12 @@ class _ReferralScreenState extends State<ReferralScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
       decoration: BoxDecoration(
-        color: AppColors.bgDarkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderDark),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
       ),
       child: Column(
         children: [
@@ -316,7 +328,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           const SizedBox(height: 6),
           Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 9), textAlign: TextAlign.center),
+          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10), textAlign: TextAlign.center),
         ],
       ),
     );

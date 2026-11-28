@@ -40,10 +40,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final user = userProv.user;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.bgDarkCard,
-        elevation: 1,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: const Text("Account Settings & Preferences", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
       ),
       body: SingleChildScrollView(
@@ -58,9 +59,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.borderDark),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -88,17 +92,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 user?.displayName.isNotEmpty == true
                                     ? user!.displayName
                                     : (user?.screenName?.isNotEmpty == true ? user!.screenName! : "Member"),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
                               ),
                               const SizedBox(height: 2),
-                              Text(user?.email ?? "", style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                              Text(user?.email ?? "", style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                             ],
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: AppColors.primaryLight.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                          child: const Text("VERIFIED", style: TextStyle(color: AppColors.accentCyan, fontSize: 9, fontWeight: FontWeight.bold)),
+                          decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(8)),
+                          child: const Text("VERIFIED", style: TextStyle(color: Color(0xFF4F46E5), fontSize: 9, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -106,45 +110,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  const Text("Notification Preferences", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const Text("Notification Preferences", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   const SizedBox(height: 12),
 
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.borderDark),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                      ],
                     ),
                     child: Column(
                       children: [
                         SwitchListTile(
-                          activeColor: AppColors.accentGold,
-                          title: const Text("Email Reading Receipts & Summaries", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Receive email confirmation after every chat/call", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                          activeColor: AppColors.primary,
+                          title: const Text("Email Reading Receipts & Summaries", style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w600)),
+                          subtitle: const Text("Receive email confirmation after every chat/call", style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                           value: _emailNotifications,
                           onChanged: (v) => setState(() => _emailNotifications = v),
                         ),
-                        const Divider(color: AppColors.borderDark, height: 1),
+                        const Divider(color: Color(0xFFE2E8F0), height: 1),
                         SwitchListTile(
-                          activeColor: AppColors.accentGold,
-                          title: const Text("Push Notifications", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Instant alerts for live chat requests & messages", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                          activeColor: AppColors.primary,
+                          title: const Text("Push Notifications", style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w600)),
+                          subtitle: const Text("Instant alerts for live chat requests & messages", style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                           value: _pushNotifications,
                           onChanged: (v) => setState(() => _pushNotifications = v),
                         ),
-                        const Divider(color: AppColors.borderDark, height: 1),
+                        const Divider(color: Color(0xFFE2E8F0), height: 1),
                         SwitchListTile(
-                          activeColor: AppColors.accentGold,
-                          title: const Text("Favorite Advisor Availability Alerts", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Get notified when your favorite psychic comes online", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                          activeColor: AppColors.primary,
+                          title: const Text("Favorite Advisor Availability Alerts", style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w600)),
+                          subtitle: const Text("Get notified when your favorite psychic comes online", style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                           value: _advisorOnlineAlerts,
                           onChanged: (v) => setState(() => _advisorOnlineAlerts = v),
                         ),
-                        const Divider(color: AppColors.borderDark, height: 1),
+                        const Divider(color: Color(0xFFE2E8F0), height: 1),
                         SwitchListTile(
-                          activeColor: AppColors.accentGold,
-                          title: const Text("SMS Reading Reminders", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Text notifications for appointment reminders", style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                          activeColor: AppColors.primary,
+                          title: const Text("SMS Reading Reminders", style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w600)),
+                          subtitle: const Text("Text notifications for appointment reminders", style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                           value: _smsAlerts,
                           onChanged: (v) => setState(() => _smsAlerts = v),
                         ),
@@ -154,26 +161,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  const Text("App & Display Preferences", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const Text("App & Display Preferences", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   const SizedBox(height: 12),
 
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.bgDarkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.borderDark),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                      ],
                     ),
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text("Display Currency", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                            const Text("Display Currency", style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14)),
                             DropdownButton<String>(
                               value: _selectedCurrency,
-                              dropdownColor: AppColors.bgDarkCard,
-                              style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 13),
+                              dropdownColor: Colors.white,
+                              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
                               underline: const SizedBox(),
                               items: const [
                                 DropdownMenuItem(value: "USD (\$)", child: Text("USD (\$)")),
@@ -187,14 +197,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ],
                         ),
-                        const Divider(color: AppColors.borderDark, height: 20),
+                        const Divider(color: Color(0xFFE2E8F0), height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text("Dark Mystical Theme Mode", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                            const Text("Dark Mystical Theme Mode", style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14)),
                             Switch(
                               value: _darkMode,
-                              activeColor: AppColors.accentGold,
+                              activeColor: AppColors.primary,
                               onChanged: (v) => setState(() => _darkMode = v),
                             ),
                           ],
@@ -228,9 +238,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          backgroundColor: AppColors.bgDarkCard,
-                          title: const Text("Delete Account Data?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          content: const Text("This action will remove your reading history, preferences, and wallet connection. Contact support to request complete data deletion.", style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 13)),
+                          backgroundColor: Colors.white,
+                          title: const Text("Delete Account Data?", style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
+                          content: const Text("This action will remove your reading history, preferences, and wallet connection. Contact support to request complete data deletion.", style: TextStyle(color: Color(0xFF475569), fontSize: 13)),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
                             ElevatedButton(
