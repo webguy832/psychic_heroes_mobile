@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../models/category_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/home_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../main_navigation_screen.dart';
@@ -51,6 +53,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
     final auth = Provider.of<AuthProvider>(context);
     final userProv = Provider.of<UserProvider>(context);
     final nav = Provider.of<NavigationProvider>(context);
+    final homeProv = Provider.of<HomeProvider>(context);
     final user = auth.isLoggedIn ? userProv.user : null;
     final isAdvisor = userProv.isAdvisor;
 
@@ -195,7 +198,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: isAdvisor
                   ? _buildAdvisorMenuItems(context, nav, auth.isLoggedIn)
-                  : _buildCustomerMenuItems(context, nav, auth.isLoggedIn),
+                  : _buildCustomerMenuItems(context, nav, homeProv, auth.isLoggedIn),
             ),
           ),
 
@@ -266,7 +269,109 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
     );
   }
 
-  List<Widget> _buildCustomerMenuItems(BuildContext context, NavigationProvider nav, bool isLoggedIn) {
+  Widget _buildServicesExpansionTile(BuildContext context, NavigationProvider nav, HomeProvider homeProv) {
+    final apiCategories = homeProv.categories;
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        iconColor: AppColors.accentGold,
+        collapsedIconColor: AppColors.textSecondaryDark,
+        leading: const Icon(Icons.psychology_rounded, color: AppColors.accentCyan, size: 20),
+        title: const Text(
+          "Services",
+          style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w500, fontSize: 13.5),
+        ),
+        children: apiCategories.isNotEmpty
+            ? [
+                ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.only(left: 48, right: 16),
+                  title: Text(
+                    "All Specialties",
+                    style: TextStyle(
+                      color: homeProv.selectedCategoryId == null ? AppColors.accentGold : AppColors.textSecondaryDark,
+                      fontWeight: homeProv.selectedCategoryId == null ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  onTap: () {
+                    homeProv.selectCategory(null);
+                    homeProv.searchAdvisors('');
+                    nav.setTab(0);
+                    Navigator.pop(context);
+                  },
+                ),
+                ...apiCategories.map((CategoryDto cat) {
+                  final isSelected = homeProv.selectedCategoryId == cat.id;
+                  return ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.only(left: 48, right: 16),
+                    title: Text(
+                      cat.name,
+                      style: TextStyle(
+                        color: isSelected ? AppColors.accentGold : AppColors.textSecondaryDark,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    onTap: () {
+                      homeProv.selectCategory(cat.id);
+                      nav.setTab(0);
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Showing advisors for ${cat.name}"),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: AppColors.primary,
+                        ),
+                      );
+                    },
+                  );
+                }),
+              ]
+            : _servicesList.map((service) {
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.only(left: 48, right: 16),
+                  title: Text(
+                    service,
+                    style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12.5),
+                  ),
+                  onTap: () {
+                    final lower = service.toLowerCase();
+                    final keyword = lower.split(' ').first;
+                    final match = homeProv.categories.where(
+                      (c) => c.name.toLowerCase().contains(keyword),
+                    );
+                    if (match.isNotEmpty) {
+                      homeProv.selectCategory(match.first.id);
+                    } else {
+                      homeProv.selectCategory(null);
+                      homeProv.searchAdvisors(keyword);
+                    }
+                    nav.setTab(0);
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Showing advisors for $service"),
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: AppColors.primary,
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
+      ),
+    );
+  }
+
+  List<Widget> _buildCustomerMenuItems(
+    BuildContext context,
+    NavigationProvider nav,
+    HomeProvider homeProv,
+    bool isLoggedIn,
+  ) {
     final showMemberMenus = isLoggedIn || nav.isDevMode;
 
     if (!showMemberMenus) {
@@ -279,32 +384,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
             Navigator.pop(context);
           },
         ),
-        Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            iconColor: AppColors.accentGold,
-            collapsedIconColor: AppColors.textSecondaryDark,
-            leading: const Icon(Icons.psychology_rounded, color: AppColors.accentCyan, size: 20),
-            title: const Text(
-              "Services",
-              style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w500, fontSize: 13.5),
-            ),
-            children: _servicesList.map((service) {
-              return ListTile(
-                dense: true,
-                contentPadding: const EdgeInsets.only(left: 48, right: 16),
-                title: Text(
-                  service,
-                  style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12.5),
-                ),
-                onTap: () {
-                  nav.setTab(0);
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ),
-        ),
+        _buildServicesExpansionTile(context, nav, homeProv),
         _buildDrawerTile(
           icon: Icons.diamond_outlined,
           title: "Platinum Luxe Services",
@@ -344,32 +424,7 @@ class _AppDrawerMenuState extends State<AppDrawerMenu> {
       ),
 
       // Expandable Web Services Dropdown
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          iconColor: AppColors.accentGold,
-          collapsedIconColor: AppColors.textSecondaryDark,
-          leading: const Icon(Icons.psychology_rounded, color: AppColors.accentCyan, size: 20),
-          title: const Text(
-            "Services",
-            style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w500, fontSize: 13.5),
-          ),
-          children: _servicesList.map((service) {
-            return ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.only(left: 48, right: 16),
-              title: Text(
-                service,
-                style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12.5),
-              ),
-              onTap: () {
-                nav.setTab(0);
-                Navigator.pop(context);
-              },
-            );
-          }).toList(),
-        ),
-      ),
+      _buildServicesExpansionTile(context, nav, homeProv),
 
       _buildDrawerTile(
         icon: Icons.forum_rounded,
